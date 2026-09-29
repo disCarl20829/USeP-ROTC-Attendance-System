@@ -1,9 +1,6 @@
-import InputError from '@/Components/InputError';
-import InputLabel from '@/Components/InputLabel';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
-import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, useForm } from '@inertiajs/react';
+import GuestLayout from '@/Layouts/GuestLayout';
+import { LockClosedIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 export default function ConfirmPassword() {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -12,7 +9,6 @@ export default function ConfirmPassword() {
 
     const submit = (e) => {
         e.preventDefault();
-
         post(route('password.confirm'), {
             onFinish: () => reset('password'),
         });
@@ -22,32 +18,36 @@ export default function ConfirmPassword() {
         <GuestLayout>
             <Head title="Confirm Password" />
 
-            <div className="mb-4 text-sm text-gray-600">
-                This is a secure area of the application. Please confirm your
-                password before continuing.
+            <div className="mb-6 flex items-center gap-3 rounded-lg bg-[#7B1E1E]/5 p-4">
+                <ShieldCheckIcon className="h-6 w-6 text-[#7B1E1E]" />
+                <p className="text-sm text-gray-600">
+                    This is a secure area of the application. Please confirm your password before continuing.
+                </p>
             </div>
 
             <form onSubmit={submit}>
-                <div className="mt-4">
-                    <InputLabel htmlFor="password" value="Password" />
-
-                    <TextInput
-                        id="password"
-                        type="password"
-                        name="password"
-                        value={data.password}
-                        className="mt-1 block w-full"
-                        isFocused={true}
-                        onChange={(e) => setData('password', e.target.value)}
-                    />
-
-                    <InputError message={errors.password} className="mt-2" />
+                <div>
+                    <label htmlFor="password" className="label-text">Password</label>
+                    <div className="relative">
+                        <LockClosedIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                        <input
+                            id="password"
+                            type="password"
+                            value={data.password}
+                            onChange={(e) => setData('password', e.target.value)}
+                            className="input-field pl-10"
+                            placeholder="Enter your password"
+                            autoComplete="current-password"
+                            autoFocus
+                        />
+                    </div>
+                    {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
                 </div>
 
-                <div className="mt-4 flex items-center justify-end">
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Confirm
-                    </PrimaryButton>
+                <div className="mt-6 flex justify-end">
+                    <button type="submit" disabled={processing} className="btn-primary">
+                        {processing ? 'Confirming...' : 'Confirm'}
+                    </button>
                 </div>
             </form>
         </GuestLayout>
