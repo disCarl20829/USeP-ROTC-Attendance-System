@@ -12,7 +12,6 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// Public landing page
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
@@ -22,42 +21,32 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
-// Protected pages: Supabase-authenticated users only
 Route::middleware('supabase.auth')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])
-        ->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('/profile', [ProfileController::class, 'edit'])
-        ->name('profile.edit');
+    // Profile
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
-    Route::patch('/profile', [ProfileController::class, 'update'])
-        ->name('profile.update');
+    // Cadets
+    Route::get('/cadets', [CadetController::class, 'index'])->name('cadets');
+    Route::post('/cadets', [CadetController::class, 'store'])->name('cadets.store');
+    Route::put('/cadets/{id}', [CadetController::class, 'update'])->name('cadets.update');
+    Route::delete('/cadets/{id}', [CadetController::class, 'destroy'])->name('cadets.destroy');
 
-    // Keep this route only if your ProfileController implements account deletion
-    // safely through Supabase Auth. Otherwise, remove it for now.
-    // Route::delete('/profile', [ProfileController::class, 'destroy'])
-    //     ->name('profile.destroy');
+    // Events Page View
+    Route::get('/events', [EventController::class, 'index'])->name('events');
+    Route::post('/events', [EventController::class, 'store'])->name('events.store');
+    Route::put('/events/{id}', [EventController::class, 'update'])->name('events.update');
+    Route::delete('/events/{id}', [EventController::class, 'destroy'])->name('events.destroy');
 
-    // ROTC QR Attendance System
-    Route::get('/cadets', [CadetController::class, 'index'])
-        ->name('cadets');
+    // Attendance & Scanner Page Views
+    Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance');
+    Route::get('/qr-scanner', [QrScanController::class, 'showScannerPage'])->name('qr-scanner');
 
-    Route::get('/events', [EventController::class, 'index'])
-        ->name('events');
-
-    Route::get('/attendance', [AttendanceController::class, 'index'])
-        ->name('attendance');
-
-    Route::get('/qr-scanner', [QrScanController::class, 'index'])
-        ->name('qr-scanner');
-
-    Route::get('/reports', [ReportController::class, 'index'])
-        ->name('reports');
-
-    Route::get('/settings', [SettingsController::class, 'index'])
-        ->name('settings');
+    // Reports & Settings
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
 });
 
-// Make sure routes/auth.php contains your custom Supabase auth routes,
-// not the original Laravel Breeze authentication routes.
 require __DIR__ . '/auth.php';

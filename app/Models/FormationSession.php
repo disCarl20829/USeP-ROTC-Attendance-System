@@ -23,7 +23,13 @@ class FormationSession extends Model
 
     public function formation()
     {
-        return $this->belongsTo(FormationEvent::class, 'formation_id');
+        return $this->belongsTo(FormationEvent::class, 'formation_id', 'formation_id');
+    }
+
+    // Alias relationship so calls to session.event resolve correctly
+    public function event()
+    {
+        return $this->belongsTo(FormationEvent::class, 'formation_id', 'formation_id');
     }
 
     public function attendanceRecords()

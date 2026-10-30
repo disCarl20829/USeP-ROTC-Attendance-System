@@ -7,9 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class AttendanceRecord extends Model
 {
     protected $table = 'attendance_records';
-
     protected $primaryKey = 'record_id';
-
     public $timestamps = false;
 
     protected $fillable = [
@@ -17,9 +15,8 @@ class AttendanceRecord extends Model
         'session_id',
         'time_in',
         'time_out',
-        'time_in_scanned_by',
-        'time_out_scanned_by',
         'status',
+        'time_in_scanned_by',
         'date_added',
     ];
 
@@ -30,6 +27,19 @@ class AttendanceRecord extends Model
 
     public function session()
     {
-        return $this->belongsTo(FormationSession::class, 'session_id');
+        return $this->belongsTo(FormationSession::class, 'session_id', 'session_id');
+    }
+
+    // Connects AttendanceRecord directly to FormationEvent through FormationSession
+    public function event()
+    {
+        return $this->hasOneThrough(
+            FormationEvent::class,
+            FormationSession::class,
+            'session_id',   // Foreign key on formation_sessions table...
+            'formation_id', // Foreign key on formation_events table...
+            'session_id',   // Local key on attendance_records table...
+            'formation_id'  // Local key on formation_sessions table...
+        );
     }
 }

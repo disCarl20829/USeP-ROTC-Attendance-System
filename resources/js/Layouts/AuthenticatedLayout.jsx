@@ -31,7 +31,7 @@ const navigation = [
     { name: 'Attendance', href: 'attendance', icon: 'clipboard' },
     { name: 'QR Scanner', href: 'qr-scanner', icon: 'qrcode' },
     { name: 'Reports', href: 'reports', icon: 'chart' },
-    { name: 'Settings', href: 'settings', icon: 'cog' },
+
 ];
 
 export default function AuthenticatedLayout({ header, children }) {

@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 class UserInfo extends Model
 {
     protected $table = 'user_info';
-
     protected $primaryKey = 'info_id';
 
     public const CREATED_AT = null;
@@ -36,22 +35,22 @@ class UserInfo extends Model
 
     public function campus()
     {
-        return $this->belongsTo(Campus::class, 'campus_id');
+        return $this->belongsTo(Campus::class, 'campus_id', 'campus_id');
     }
 
     public function course()
     {
-        return $this->belongsTo(Course::class, 'course_id');
+        return $this->belongsTo(Course::class, 'course_id', 'course_id');
     }
 
     public function role()
     {
-        return $this->belongsTo(Role::class, 'role_id');
+        return $this->belongsTo(Role::class, 'role_id', 'role_id');
     }
 
     public function platoon()
     {
-        return $this->belongsTo(Platoon::class, 'platoon_id');
+        return $this->belongsTo(Platoon::class, 'platoon_id', 'platoon_id');
     }
 
     public function attendanceQr()

@@ -4,16 +4,21 @@ namespace App\Http\Controllers\Attendance;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ScanAttendanceRequest;
-use App\Models\AttendanceQr;
 use App\Models\AttendanceRecord;
 use App\Models\FormationSession;
 use App\Models\UserInfo;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class QrScanController extends Controller
 {
-    public function index()
+    public function showScannerPage()
+    {
+        return Inertia::render('QRScanner');
+    }
+
+    public function getEvents()
     {
         $events = FormationSession::with('formation')->get();
 
@@ -21,53 +26,67 @@ class QrScanController extends Controller
     }
 
     public function scan(ScanAttendanceRequest $request)
-    {
-        $validated = $request->validated();
+{
+    $validated = $request->validated();
+    $rawInput = trim($validated['student_id_number']);
 
-        $qr = AttendanceQr::where('qr_token', $validated['qr_token'])
-            ->where('is_active', true)
-            ->first();
-
-        if (!$qr) {
-            return response()->json([
-                'status' => 'invalid',
-                'message' => 'QR code not found or inactive',
-            ], 404);
-        }
-
-        $userInfo = UserInfo::where('user_id', $qr->user_id)->first();
-        $session = FormationSession::with('formation')->find($validated['session_id']);
-
-        if (!$userInfo || !$session) {
-            return response()->json([
-                'status' => 'invalid',
-                'message' => 'Cadet or session not found',
-            ], 404);
-        }
-
-        $status = 'present';
-        if ($session->late_time) {
-            $timeIn = $session->time_in ? Carbon::parse($session->time_in) : now();
-            $lateAt = Carbon::parse($session->late_time);
-            $status = $timeIn->gt($lateAt) ? 'late' : 'present';
-        }
-
-        $record = AttendanceRecord::updateOrCreate(
-            [
-                'user_id' => $qr->user_id,
-                'session_id' => $session->session_id,
-            ],
-            [
-                'time_in' => now(),
-                'time_out' => null,
-                'status' => $status,
-                'time_in_scanned_by' => $validated['scanned_by'],
-            ]
-        );
-
-        return response()->json([
-            'status' => $status,
-            'data' => $record->load(['user', 'session']),
-        ]);
+    // Extract student ID pattern (e.g., 2026-00382) if raw string contains a prefix
+    if (preg_match('/\d{4}-\d{4,6}/', $rawInput, $matches)) {
+        $scannedId = $matches[0];
+    } else {
+        $scannedId = $rawInput;
     }
+
+    // Build the query searching by email prefix first
+    $query = UserInfo::where('email', 'LIKE', $scannedId . '@%')
+        ->orWhere('email', 'LIKE', '%' . $scannedId . '%');
+
+    // Only query user_id if the scanned string is actually a valid UUID format
+    if (\Illuminate\Support\Str::isUuid($scannedId)) {
+        $query->orWhere('user_id', $scannedId);
+    }
+
+    $userInfo = $query->first();
+
+    if (!$userInfo) {
+        return response()->json([
+            'status'  => 'invalid',
+            'message' => 'Cadet with ID "' . $scannedId . '" not found in database.',
+        ], 404);
+    }
+
+    $session = FormationSession::find($validated['session_id']);
+
+    if (!$session) {
+        return response()->json([
+            'status'  => 'invalid',
+            'message' => 'Formation session not found.',
+        ], 404);
+    }
+
+    // Determine attendance status based on session late threshold
+    $status = 'present';
+    if ($session->late_time) {
+        $status = now()->gt(Carbon::parse($session->late_time)) ? 'late' : 'present';
+    }
+
+    $record = AttendanceRecord::updateOrCreate(
+        [
+            'user_id'    => $userInfo->user_id,
+            'session_id' => $session->session_id,
+        ],
+        [
+            'time_in'            => now(),
+            'time_out'           => null,
+            'status'             => $status,
+            'time_in_scanned_by' => $validated['scanned_by'],
+        ]
+    );
+
+    return response()->json([
+        'status'  => $status,
+        'message' => 'Attendance logged for ' . trim($userInfo->first_name . ' ' . $userInfo->last_name),
+        'data'    => $record->load(['user', 'session']),
+    ]);
+}
 }

@@ -14,9 +14,9 @@ class ScanAttendanceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'qr_token' => ['required', 'uuid'],
-            'session_id' => ['required', 'integer', 'exists:formation_sessions,session_id'],
-            'scanned_by' => ['required', 'uuid'],
+            'student_id_number' => 'required|string',
+            'session_id'        => 'required|integer|exists:formation_sessions,session_id',
+            'scanned_by'        => 'required|string',
         ];
     }
 }

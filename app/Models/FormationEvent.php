@@ -29,6 +29,11 @@ class FormationEvent extends Model
         return $this->hasMany(FormationSession::class, 'formation_id');
     }
 
+    public function attendanceRecords()
+    {
+        return $this->hasMany(AttendanceRecord::class, 'formation_id');
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
