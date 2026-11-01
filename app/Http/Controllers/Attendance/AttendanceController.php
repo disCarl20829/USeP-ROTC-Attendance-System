@@ -3,93 +3,82 @@
 namespace App\Http\Controllers\Attendance;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreAttendanceRequest;
 use App\Models\AttendanceRecord;
 use App\Models\FormationSession;
+use App\Models\UserInfo;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class AttendanceController extends Controller
 {
     public function index()
     {
-        // 1. Fetch attendance records with related user and session formation
-        $rawRecords = AttendanceRecord::with(['user', 'session.formation'])
-            ->latest('date_added')
-            ->get();
-
-        // 2. Format records array for frontend consumption
-        $records = $rawRecords->map(function ($record) {
-            $user = $record->user;
-            $session = $record->session;
-            $formation = $session?->formation;
-
-            $firstName = $user?->first_name ?? '';
-            $lastName = $user?->last_name ?? '';
-            $cadetName = trim("{$firstName} {$lastName}") ?: 'Unknown Cadet';
-
-            // Extract Student ID Number from email prefix (e.g., 2026-00382@usep.edu.ph -> 2026-00382)
-            $idNumber = $user?->email ? explode('@', $user->email)[0] : 'N/A';
-
-            $sessionType = $session?->session_type ? ucfirst($session->session_type) . ' Session' : '';
-            $formationName = $formation?->formation_name ?? 'Formation';
-            $eventName = $sessionType ? "{$sessionType} — {$formationName}" : $formationName;
-
-            $timeIn = $record->time_in ? Carbon::parse($record->time_in) : null;
-            $formattedDate = $timeIn ? $timeIn->format('M d, Y') : 'N/A';
-            $formattedTime = $timeIn ? $timeIn->format('h:i A') : '-';
-
-            return [
-                'id'        => $record->record_id ?? $record->id,
-                'cadet'     => $cadetName,
-                'idNumber'  => $idNumber,
-                'event'     => $eventName,
-                'date'      => $formattedDate,
-                'rawDate'   => $timeIn ? $timeIn->format('Y-m-d') : '',
-                'time'      => $formattedTime,
-                'status'    => strtolower($record->status ?? 'absent'),
-            ];
-        });
-
-        // 3. Calculate summary stats directly from the raw database records collection
-        $stats = [
-            'present' => $rawRecords->where('status', 'present')->count(),
-            'late'    => $rawRecords->where('status', 'late')->count(),
-            'absent'  => $rawRecords->where('status', 'absent')->count(),
-        ];
-
-        // 4. Extract unique formation event names for filtering dropdown
-        $events = FormationSession::with('formation')
+        // 1. Fetch ALL formation sessions with relationship fallback mapping
+        $sessions = FormationSession::with('formation')
             ->get()
-            ->map(fn($s) => $s->formation?->formation_name)
-            ->filter()
-            ->unique()
+            ->map(function ($session) {
+                $sessionId     = $session->session_id ?? $session->id;
+                $sessionType   = ucfirst($session->session_type ?? 'Formation');
+                $formationName = $session->formation?->formation_name 
+                    ?? $session->title 
+                    ?? $session->name 
+                    ?? 'Session #' . $sessionId;
+                
+                $dateRaw = $session->formation?->formation_date ?? $session->created_at ?? null;
+                $formattedDate = $dateRaw ? Carbon::parse($dateRaw)->format('M d, Y') : '';
+
+                return [
+                    'session_id' => (string) $sessionId,
+                    'label'      => "{$sessionType} — {$formationName}" . ($formattedDate ? " ({$formattedDate})" : ''),
+                    'date'       => $formattedDate,
+                ];
+            })
+            ->filter(fn($s) => !empty($s['session_id']))
             ->values();
 
+        // 2. Fetch all registered cadets sorted alphabetically (A-Z) by last name
+        $cadets = UserInfo::orderBy('last_name', 'asc')
+            ->orderBy('first_name', 'asc')
+            ->get()
+            ->map(function ($user) {
+                $firstName = $user->first_name ?? '';
+                $lastName  = $user->last_name ?? '';
+                $fullName  = trim("{$lastName}, {$firstName}");
+                $idNumber  = $user->serial_number ?? ($user->email ? explode('@', $user->email)[0] : 'N/A');
+
+                return [
+                    'user_id'   => $user->user_id,
+                    'name'      => $fullName ?: 'Unknown Cadet',
+                    'id_number' => $idNumber,
+                ];
+            })
+            ->values();
+
+        // 3. Fetch all attendance scan records
+        $records = AttendanceRecord::all()->map(function ($record) {
+            $timeIn  = $record->time_in ? Carbon::parse($record->time_in)->format('h:i A') : '--:--';
+            $timeOut = $record->time_out ? Carbon::parse($record->time_out)->format('h:i A') : '--:--';
+
+            return [
+                'record_id'  => $record->record_id ?? $record->id,
+                'user_id'    => $record->user_id,
+                'session_id' => (string) $record->session_id,
+                'time_in'    => $timeIn,
+                'time_out'   => $timeOut,
+                'status'     => strtolower($record->status ?? 'present'),
+            ];
+        })->values();
+
+        // Standard API endpoint return for QR Scanner live feed calls
+        if (request()->is('api/*')) {
+            return response()->json($records);
+        }
+
+        // Inertia page view rendering
         return Inertia::render('Attendance', [
-            'records' => $records,
-            'stats'   => $stats,
-            'events'  => $events,
+            'sessions' => $sessions,
+            'cadets'   => $cadets,
+            'records'  => $records,
         ]);
-    }
-
-    public function store(StoreAttendanceRequest $request)
-    {
-        $validated = $request->validated();
-
-        $record = AttendanceRecord::updateOrCreate(
-            [
-                'user_id'    => $validated['user_id'],
-                'session_id' => $validated['session_id'],
-            ],
-            [
-                'time_in'  => $validated['time_in'] ?? now(),
-                'time_out' => $validated['time_out'] ?? null,
-                'status'   => $validated['status'],
-            ]
-        );
-
-        return response()->json($record->load(['user', 'session']), 201);
     }
 }

@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AttendanceRecord extends Model
 {
+    use HasFactory;
+
     protected $table = 'attendance_records';
     protected $primaryKey = 'record_id';
+
+    // Disable default created_at and updated_at column expectations
     public $timestamps = false;
 
     protected $fillable = [
@@ -17,29 +23,26 @@ class AttendanceRecord extends Model
         'time_out',
         'status',
         'time_in_scanned_by',
+        'time_out_scanned_by',
         'date_added',
     ];
 
-    public function user()
+    /**
+     * Cast attributes to native Carbon datetime objects.
+     */
+    protected $casts = [
+        'time_in'    => 'datetime',
+        'time_out'   => 'datetime',
+        'date_added' => 'datetime',
+    ];
+
+    public function user(): BelongsTo
     {
         return $this->belongsTo(UserInfo::class, 'user_id', 'user_id');
     }
 
-    public function session()
+    public function session(): BelongsTo
     {
         return $this->belongsTo(FormationSession::class, 'session_id', 'session_id');
-    }
-
-    // Connects AttendanceRecord directly to FormationEvent through FormationSession
-    public function event()
-    {
-        return $this->hasOneThrough(
-            FormationEvent::class,
-            FormationSession::class,
-            'session_id',   // Foreign key on formation_sessions table...
-            'formation_id', // Foreign key on formation_events table...
-            'session_id',   // Local key on attendance_records table...
-            'formation_id'  // Local key on formation_sessions table...
-        );
     }
 }
