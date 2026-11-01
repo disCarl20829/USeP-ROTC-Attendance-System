@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class UserInfo extends Model
 {
+    use HasFactory;
+
     protected $table = 'user_info';
     protected $primaryKey = 'info_id';
 
@@ -22,6 +25,9 @@ class UserInfo extends Model
         'platoon_id',
         'placement',
         'is_system_admin',
+        'status',
+        'student_id_number',
+        'serial_number',
         'date_added',
         'updated_at',
     ];
