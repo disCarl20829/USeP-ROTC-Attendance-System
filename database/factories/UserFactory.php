@@ -1,5 +1,5 @@
 <?php
-
+# REDACTED: Removed the default comment block for the UserFactory class.
 namespace Database\Factories;
 
 use App\Models\User;

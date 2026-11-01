@@ -1,59 +1,189 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# USeP ROTC QR Attendance System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A web-based attendance system for the **USeP ROTC Unit (Tagum-Mabini Campus)**.
+Cadets are identified by a QR code, and attendance is recorded per formation session
+(morning / afternoon) with `present`, `late`, or `absent` status.
 
-## About Laravel
+> **Stack:** Laravel 12 · Inertia.js 2 · React 18 · Tailwind CSS 4 · Vite 7
+> **Database / Auth:** Supabase (PostgreSQL + Supabase Auth REST API)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Project status
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Phase | Scope | Status |
+| --- | --- | --- |
+| 1 | Database migrations + Eloquent models | ✅ Done |
+| 2 | Controllers, routes, Form Requests, QR auto-assignment | ✅ Done |
+| 3 | Frontend wiring (React ↔ API) + modern UI | 🟡 Partial |
+| 4 | QR camera scanning / QR image generation | ❌ Not started |
+| 5 | Auth polish (token refresh, profile), tests, deployment | ❌ Not started |
 
-## Learning Laravel
+> See **[docs/TODO.md](docs/TODO.md)** for the full, prioritized list of what is left.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+---
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Features
 
-## Laravel Sponsors
+### Working
+- Supabase Auth login / registration / logout (USeP email domain enforced)
+- Session-based auth guard for all protected pages and API routes
+- Cadet CRUD API with **automatic QR token generation**
+- Formation events + morning/afternoon sessions
+- QR scan endpoint (marks `present` / `late` based on `late_time`)
+- Attendance records + reports summary API
+- Settings (default start / end / late times) API
+- Modernized Inertia/React UI with the USeP maroon & gold theme
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Partially working
+- **QR Scanner page** — the API flow is wired, but input is a **manual token field**.
+  There is no camera scanning and no QR image display yet.
+- **Frontend pages** — only the QR Scanner uses the API. Dashboard, Cadets, Events,
+  Attendance, Reports and Settings still render **static mock data**.
 
-### Premium Partners
+### Not built yet
+- QR code image generation / printable cadet IDs
+- Camera-based scanning
+- Cadet creation/edit UI (the "Add Cadet" button does nothing yet)
+- Role / permission enforcement
+- Automated tests and seeders for real data
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+---
 
-## Contributing
+## Quick start
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Requirements
+- PHP **8.2+** with the **`pdo_pgsql`** extension enabled
+- Composer
+- Node.js **18+** and npm
+- Access to the Supabase project (database + auth)
 
-## Code of Conduct
+### 1. Install dependencies
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+composer install
+npm install
+```
 
-## Security Vulnerabilities
+### 2. Configure environment
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Copy `.env.example` to `.env` (if missing) and set:
 
-## License
+```env
+APP_URL=http://127.0.0.1:8000
+APP_KEY=base64:...           # php artisan key:generate
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+DB_CONNECTION=pgsql
+DB_HOST=db.<project-ref>.supabase.co
+DB_PORT=5432
+DB_DATABASE=postgres
+DB_USERNAME=postgres
+DB_PASSWORD=<your-password>
+
+SESSION_DRIVER=database
+
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=<your-anon-key>
+```
+
+### 3. Prepare the database
+
+```bash
+php artisan migrate
+php artisan optimize:clear
+```
+
+> The tables must match `rotcu_usep.sql` (custom primary keys such as `campus_id`,
+> `info_id`, `session_id`, and foreign keys to `auth.users`).
+> See **[docs/GUIDE.md](docs/GUIDE.md#database)** for details.
+
+### 4. Run the app
+
+```bash
+# terminal 1
+php artisan serve
+
+# terminal 2
+npm run dev
+```
+
+Open <http://127.0.0.1:8000> and sign in with a **@usep.edu.ph** account.
+
+---
+
+## Main routes
+
+| Route | Type | Description |
+| --- | --- | --- |
+| `/` | Page | Public landing page |
+| `/login`, `/register` | Page | Supabase Auth |
+| `/dashboard` | Page | Dashboard |
+| `/cadets` | Page | Cadet management |
+| `/events` | Page | Formation events |
+| `/attendance` | Page | Attendance records |
+| `/qr-scanner` | Page | QR scanner |
+| `/reports` | Page | Reports |
+| `/settings` | Page | Default time settings |
+
+All API endpoints live under `/api` and require a logged-in session:
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/api/dashboard` | Dashboard stats |
+| GET/POST | `/api/cadets` | List / create cadets |
+| PUT/DELETE | `/api/cadets/{id}` | Update / delete cadet |
+| GET/POST | `/api/events` | List / create events (with sessions) |
+| PUT/DELETE | `/api/events/{id}` | Update / delete event |
+| GET/POST | `/api/attendance` | List / create attendance records |
+| POST | `/api/attendance/scan` | Scan a QR token |
+| GET | `/api/reports` | Records + summary |
+| GET/PUT | `/api/settings` | Default times |
+
+---
+
+## Project structure
+
+```text
+app/
+├── Http/
+│   ├── Controllers/            # Page + API controllers
+│   │   ├── Attendance/         # Attendance, QR scan, reports
+│   │   ├── AuthController.php  # Supabase login / register / logout
+│   │   └── ...
+│   ├── Middleware/
+│   │   ├── SupabaseAuth.php        # Session guard
+│   │   └── HandleInertiaRequests.php
+│   └── Requests/               # Validation
+├── Models/                     # Eloquent models (custom PKs)
+database/
+├── migrations/                 # Mirrors rotcu_usep.sql
+└── seeders/
+resources/
+├── css/app.css                 # Design system (maroon & gold)
+└── js/
+    ├── Layouts/                # AuthenticatedLayout, GuestLayout
+    └── Pages/                  # Inertia pages
+routes/
+├── web.php                     # Inertia pages
+├── api.php                     # JSON API
+└── auth.php                    # Supabase auth routes
+```
+
+---
+
+## Documentation
+
+- **[docs/GUIDE.md](docs/GUIDE.md)** — setup, architecture, auth flow, API details,
+  and **how to test the QR flow today**
+- **[docs/TODO.md](docs/TODO.md)** — what is not done yet (dynamic wiring checklist)
+- **[CHANGELOG.md](CHANGELOG.md)** — what changed and when
+
+---
+
+## Known limitations
+
+- The Supabase **access token expires after ~1 hour** and is not refreshed yet.
+- `SESSION_DRIVER=database` requires the `sessions` table (created by migration).
+- The scan flow needs existing reference data (campus, course, role, platoon).
+- `/profile` still uses Laravel's `$request->user()`, which is `null` under
+  Supabase auth — that page is not usable yet.

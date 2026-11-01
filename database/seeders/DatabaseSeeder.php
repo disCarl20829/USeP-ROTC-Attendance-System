@@ -1,4 +1,5 @@
 <?php
+# REDACTED: Removed the default comment block for the DatabaseSeeder class.
 
 namespace Database\Seeders;
 
