@@ -120,20 +120,7 @@ export default function AuthenticatedLayout({ header, children }) {
                         <h1 className="text-lg font-semibold text-gray-900">{header}</h1>
                     )}
 
-                    <div className="ml-auto flex items-center gap-3">
-                        <div className="relative hidden sm:block">
-                            <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search..."
-                                className="input-field w-64 pl-9"
-                            />
-                        </div>
-                        <button className="relative rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700">
-                            <Icon name="bell" className="h-5 w-5" />
-                            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
-                        </button>
-                    </div>
+                    
                 </header>
 
                 <main className="p-4 sm:p-6 lg:p-8">{children}</main>
