@@ -45,4 +45,12 @@ class AttendanceRecord extends Model
     {
         return $this->belongsTo(FormationSession::class, 'session_id', 'session_id');
     }
+
+    /**
+     * Relationship for eager loading 'event' in DashboardController
+     */
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(FormationSession::class, 'session_id', 'session_id');
+    }
 }
