@@ -237,6 +237,35 @@ export default function QRScanner() {
         };
     }, []);
 
+    // Robust fallbacks for Name & ID extraction
+    const getCadetName = (scan) => {
+        const u = scan.user || scan.user_info;
+        if (u) {
+            if (u.name) return u.name;
+            const full = `${u.first_name || ''} ${u.last_name || ''}`.trim();
+            if (full) return full;
+        }
+        if (scan.first_name || scan.last_name) {
+            return `${scan.first_name || ''} ${scan.last_name || ''}`.trim();
+        }
+        return scan.student_name || scan.cadet_name || scan.cadet || 'Cadet';
+    };
+
+    const getCadetId = (scan) => {
+        const u = scan.user || scan.user_info;
+        return (
+            u?.student_id_number ||
+            u?.serial_number ||
+            u?.idNumber ||
+            u?.student_id ||
+            scan.student_id_number ||
+            scan.serial_number ||
+            scan.idNumber ||
+            scan.student_id ||
+            'N/A'
+        );
+    };
+
     const displayedScans = recentScans.filter((scan) => {
         if (!selectedSessionId) return true;
         return Number(scan.session_id) === Number(selectedSessionId);
@@ -381,45 +410,45 @@ export default function QRScanner() {
                 </div>
 
                 {/* Database Roster Log */}
-<div className="card bg-white shadow rounded-lg overflow-hidden border border-gray-200">
-    <div className="border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 flex justify-between items-center">
-        <div>
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Database Attendance Roster</h3>
-            <p className="text-xs text-gray-500">Live database records for selected session</p>
-        </div>
-    </div>
-    <div className="divide-y divide-gray-100 max-h-[380px] overflow-y-auto">
-        {displayedScans.length === 0 ? (
-            <div className="p-6 text-center text-xs sm:text-sm text-gray-500">
-                No database records logged for this session yet.
-            </div>
-        ) : (
-            displayedScans.map((scan) => (
-                <div key={scan.record_id || scan.id} className="flex items-center gap-3 px-4 py-3 sm:px-6">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                        <CheckCircleIcon className="h-5 w-5 text-emerald-600" />
+                <div className="card bg-white shadow rounded-lg overflow-hidden border border-gray-200">
+                    <div className="border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 flex justify-between items-center">
+                        <div>
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Database Attendance Roster</h3>
+                            <p className="text-xs text-gray-500">Live database records for selected session</p>
+                        </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                            {scan.user?.first_name ? `${scan.user.first_name} ${scan.user.last_name}` : (scan.student_name ?? scan.cadet ?? 'Cadet')}
-                        </p>
-                        <p className="text-[11px] sm:text-xs text-gray-500 font-mono">
-                            ID: {scan.user?.serial_number ?? scan.student_id_number ?? scan.idNumber ?? scan.student_id ?? ''}
-                        </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                        <p className="text-[11px] sm:text-xs text-emerald-700 font-mono font-medium">
-                            IN: {scan.time_in ?? scan.entry_date ?? scan.in_time ?? '--:--'}
-                        </p>
-                        <p className="text-[11px] sm:text-xs text-rose-600 font-mono font-medium">
-                            OUT: {scan.time_out ?? scan.exit_date ?? scan.out_time ?? '--:--'}
-                        </p>
+                    <div className="divide-y divide-gray-100 max-h-[380px] overflow-y-auto">
+                        {displayedScans.length === 0 ? (
+                            <div className="p-6 text-center text-xs sm:text-sm text-gray-500">
+                                No database records logged for this session yet.
+                            </div>
+                        ) : (
+                            displayedScans.map((scan) => (
+                                <div key={scan.record_id || scan.id} className="flex items-center gap-3 px-4 py-3 sm:px-6">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                                        <CheckCircleIcon className="h-5 w-5 text-emerald-600" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                                            {getCadetName(scan)}
+                                        </p>
+                                        <p className="text-[11px] sm:text-xs text-gray-500 font-mono">
+                                            ID: {getCadetId(scan)}
+                                        </p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-[11px] sm:text-xs text-emerald-700 font-mono font-medium">
+                                            IN: {scan.time_in ?? scan.entry_date ?? scan.in_time ?? '--:--'}
+                                        </p>
+                                        <p className="text-[11px] sm:text-xs text-rose-600 font-mono font-medium">
+                                            OUT: {scan.time_out ?? scan.exit_date ?? scan.out_time ?? '--:--'}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
-            ))
-        )}
-    </div>
-</div>
             </div>
 
             {modalConfig.isOpen && (
