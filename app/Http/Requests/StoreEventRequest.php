@@ -17,12 +17,24 @@ class StoreEventRequest extends FormRequest
             'formation_name' => ['required', 'string', 'max:255'],
             'formation_date' => ['required', 'date'],
             'formation_type' => ['required', 'in:whole_day,half_day'],
-            'created_by' => ['required', 'uuid'],
+            'created_by' => ['nullable', 'uuid', 'exists:users,id'],
             'sessions' => ['sometimes', 'array'],
             'sessions.*.session_type' => ['required', 'in:morning,afternoon'],
-            'sessions.*.start_time' => ['required', 'time'],
-            'sessions.*.end_time' => ['required', 'time'],
-            'sessions.*.late_time' => ['required', 'time'],
+            'sessions.*.start_time' => ['required', 'date_format:H:i'],
+            'sessions.*.end_time' => ['required', 'date_format:H:i', 'after:sessions.*.start_time'],
+            'sessions.*.late_time' => ['nullable', 'date_format:H:i'],
         ];
+    }
+
+    /**
+     * Merge authenticated user ID if created_by is omitted from frontend payload.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (!$this->has('created_by') && auth()->check()) {
+            $this->merge([
+                'created_by' => auth()->id(),
+            ]);
+        }
     }
 }
