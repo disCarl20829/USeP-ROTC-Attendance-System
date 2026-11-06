@@ -9,26 +9,13 @@ use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
-    /**
-     * The root template that is loaded on the first page visit.
-     *
-     * @var string
-     */
     protected $rootView = 'app';
 
-    /**
-     * Determine the current asset version.
-     */
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /**
-     * Define the props that are shared by default.
-     *
-     * @return array<string, mixed>
-     */
     public function share(Request $request): array
     {
         return [
@@ -39,13 +26,6 @@ class HandleInertiaRequests extends Middleware
         ];
     }
 
-    /**
-     * Build the authenticated user from the Supabase session.
-     *
-     * Laravel's own guard is not used, so $request->user() is null.
-     * The Supabase identity lives in the session; the matching
-     * user_info row (if any) supplies the display name.
-     */
     private function supabaseUser(Request $request): ?array
     {
         $userId = $request->session()->get('supabase_user_id');
@@ -55,17 +35,29 @@ class HandleInertiaRequests extends Middleware
             return null;
         }
 
-        $profile = UserInfo::where('user_id', $userId)->first();
+        $profile = UserInfo::with('role')
+            ->where('user_id', $userId)
+            ->orWhere('email', $email)
+            ->first();
 
         $name = $profile
             ? trim($profile->first_name.' '.$profile->last_name)
             : Str::before($email, '@');
 
+        $roleName  = strtolower($profile?->role?->role_name ?? 'cadet');
+        $isAdmin   = (bool) ($profile?->is_system_admin || in_array($roleName, ['admin', 'officer']));
+        $isScanner = (bool) ($isAdmin || in_array($roleName, ['aspirant', 'scanner']));
+        $isCadet   = (bool) ($roleName === 'cadet' && !$isAdmin);
+
         return [
-            'id' => $userId,
-            'name' => $name !== '' ? $name : $email,
-            'email' => $email,
+            'id'              => $userId,
+            'name'            => $name !== '' ? $name : $email,
+            'email'           => $email,
+            'role'            => $roleName,
             'is_system_admin' => (bool) ($profile?->is_system_admin),
+            'is_admin'        => $isAdmin,
+            'is_scanner'      => $isScanner,
+            'is_cadet'        => $isCadet,
         ];
     }
 }

@@ -121,7 +121,7 @@ export default function QRScanner() {
             return;
         }
 
-        const studentIdMatch = scannedPayload.match(/\d{4}-\d{5}/) || scannedPayload.match(/\d{4}-\d{4,6}/);
+        const studentIdMatch = scannedPayload.match(/\d{4}-\d{4,6}/) || scannedPayload.match(/[A-Za-z0-9-]+/);
         const cleanedStudentId = studentIdMatch ? studentIdMatch[0] : scannedPayload.trim();
 
         if (cleanedStudentId === lastScannedId.current && (now - lastScanTime.current) < SCAN_COOLDOWN) {
@@ -142,7 +142,7 @@ export default function QRScanner() {
                 session_id: Number(currentActiveSessionId),
                 scan_type: currentScanType,
                 type: currentScanType.toLowerCase(),
-                scanned_by: user?.id ?? user?.email ?? 'System Officer',
+                scanned_by: user?.email ?? user?.name ?? 'System Officer',
             });
 
             setModalConfig({
@@ -253,17 +253,24 @@ export default function QRScanner() {
 
     const getCadetId = (scan) => {
         const u = scan.user || scan.user_info;
-        return (
-            u?.student_id_number ||
-            u?.serial_number ||
-            u?.idNumber ||
-            u?.student_id ||
-            scan.student_id_number ||
-            scan.serial_number ||
-            scan.idNumber ||
-            scan.student_id ||
-            'N/A'
+        const candidates = [
+            u?.student_id_number,
+            u?.serial_number,
+            u?.student_id,
+            u?.id_number,
+            u?.idNumber,
+            scan.student_id_number,
+            scan.serial_number,
+            scan.student_id,
+            scan.idNumber,
+            scan.id_number,
+        ];
+
+        const validId = candidates.find(
+            (val) => val !== undefined && val !== null && String(val).trim() !== '' && String(val).trim() !== 'N/A'
         );
+
+        return validId ? String(validId).trim() : 'N/A';
     };
 
     const displayedScans = recentScans.filter((scan) => {
