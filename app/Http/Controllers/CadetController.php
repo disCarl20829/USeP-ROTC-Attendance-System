@@ -32,6 +32,7 @@ class CadetController extends Controller
                 return [
                     'id'                => $user->user_id ?? $user->info_id,
                     'user_id'           => $user->user_id ?? $user->info_id,
+                    'info_id'           => $user->info_id,
                     'firstName'         => $firstName,
                     'lastName'          => $lastName,
                     'name'              => $fullName ?: 'Unknown Cadet',
@@ -62,6 +63,58 @@ class CadetController extends Controller
         ]);
     }
 
+    /**
+     * Store a newly created cadet.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'first_name'        => 'required|string|max:255',
+            'last_name'         => 'required|string|max:255',
+            'email'             => 'nullable|email|max:255',
+            'student_id_number' => 'nullable|string|max:50',
+            'course_id'         => 'nullable',
+            'campus_id'         => 'nullable',
+            'platoon_id'        => 'nullable',
+            'role_id'           => 'nullable',
+        ]);
+
+        $cadet = new UserInfo();
+        $cadet->user_id         = (string) Str::uuid();
+        $cadet->first_name      = trim($validated['first_name']);
+        $cadet->last_name       = trim($validated['last_name']);
+        $cadet->email           = !empty($validated['email']) ? trim($validated['email']) : null;
+        $cadet->course_id       = $validated['course_id'] ?? null;
+        $cadet->campus_id       = $validated['campus_id'] ?? 1;
+        $cadet->platoon_id      = $validated['platoon_id'] ?? null;
+        $cadet->role_id         = $validated['role_id'] ?? 4; // Default to Cadet role ID
+        $cadet->placement       = 1;
+        $cadet->is_system_admin = false;
+
+        if (Schema::hasColumn('user_info', 'status')) {
+            $cadet->status = 'active';
+        }
+
+        if (!empty($validated['student_id_number'])) {
+            if (Schema::hasColumn('user_info', 'student_id_number')) {
+                $cadet->student_id_number = $validated['student_id_number'];
+            } elseif (Schema::hasColumn('user_info', 'serial_number')) {
+                $cadet->serial_number = $validated['student_id_number'];
+            }
+        }
+
+        if (Schema::hasColumn('user_info', 'date_added')) {
+            $cadet->date_added = now();
+        }
+
+        $cadet->save();
+
+        return redirect()->back()->with('success', 'Cadet created successfully.');
+    }
+
+    /**
+     * Update an existing cadet.
+     */
     public function update(Request $request, $id)
     {
         $query = UserInfo::query();
@@ -88,7 +141,6 @@ class CadetController extends Controller
             'status'            => 'required|string|in:active,dropped',
         ]);
 
-        // Safely set status if column exists in the database
         if (Schema::hasColumn('user_info', 'status')) {
             $cadet->status = strtolower($validated['status']);
         }
@@ -100,7 +152,7 @@ class CadetController extends Controller
             $cadet->last_name = $validated['last_name'];
         }
         if (array_key_exists('email', $validated)) {
-            $cadet->email = $validated['email'];
+            $cadet->email = !empty($validated['email']) ? trim($validated['email']) : null;
         }
         if (array_key_exists('course_id', $validated)) {
             $cadet->course_id = $validated['course_id'];
@@ -125,6 +177,27 @@ class CadetController extends Controller
 
         $cadet->save();
 
-        return redirect()->back()->with('success', 'Cadet status updated successfully.');
+        return redirect()->back()->with('success', 'Cadet updated successfully.');
+    }
+
+    /**
+     * Delete a cadet.
+     */
+    public function destroy($id)
+    {
+        $query = UserInfo::query();
+
+        if (Str::isUuid($id)) {
+            $query->where('user_id', $id);
+        } elseif (is_numeric($id)) {
+            $query->where('info_id', (int) $id);
+        } else {
+            $query->where('user_id', $id);
+        }
+
+        $cadet = $query->firstOrFail();
+        $cadet->delete();
+
+        return redirect()->back()->with('success', 'Cadet deleted successfully.');
     }
 }
