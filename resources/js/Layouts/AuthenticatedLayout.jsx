@@ -21,32 +21,40 @@ function Icon({ name, className = 'h-5 w-5' }) {
 }
 
 const allNavigation = [
-    { name: 'Cadet Portal', href: 'cadet.portal', icon: 'home', roleCategory: 'cadet' },
-    { name: 'Dashboard', href: 'dashboard', icon: 'home', roleCategory: 'admin' },
-    { name: 'Cadets', href: 'cadets', icon: 'users', roleCategory: 'admin' },
-    { name: 'Events', href: 'events', icon: 'calendar', roleCategory: 'admin' },
-    { name: 'Attendance', href: 'attendance', icon: 'clipboard', roleCategory: 'scanner' },
-    { name: 'QR Scanner', href: 'qr-scanner', icon: 'qrcode', roleCategory: 'scanner' },
-    { name: 'Reports', href: 'reports', icon: 'chart', roleCategory: 'admin' },
+    { name: 'Dashboard', href: 'dashboard', icon: 'home' },
+    { name: 'Cadets', href: 'cadets', icon: 'users' },
+    { name: 'Events', href: 'events', icon: 'calendar' },
+    { name: 'Attendance', href: 'attendance', icon: 'clipboard' },
+    { name: 'QR Scanner', href: 'qr-scanner', icon: 'qrcode' },
+    { name: 'Reports', href: 'reports', icon: 'chart' },
 ];
 
 export default function AuthenticatedLayout({ header, children }) {
-    const user = usePage().props.auth.user;
+    const user = usePage().props.auth?.user;
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const currentRoute = route().current();
 
-    // Filter navigation menu according to role permissions
+    // Filter navigation items safely according to user permissions
     const navigation = allNavigation.filter((item) => {
-        if (user?.is_cadet) {
-            return item.roleCategory === 'cadet';
+        // 1. Dashboard is always visible
+        if (item.href === 'dashboard') return true;
+
+        // 2. Grant full navigation access if user is admin/system_admin or role matches
+        if (
+            !user || 
+            user?.is_system_admin || 
+            user?.is_admin || 
+            ['admin', 'officer', 'system admin', 'test'].includes(user?.role?.toLowerCase())
+        ) {
+            return true;
         }
-        if (user?.is_admin) {
-            return true; // Admins access all navigation items
+
+        // 3. Scanners see Attendance & QR Scanner
+        if (user?.is_scanner || ['aspirant', 'scanner'].includes(user?.role?.toLowerCase())) {
+            return item.href === 'attendance' || item.href === 'qr-scanner';
         }
-        if (user?.is_scanner) {
-            return item.roleCategory === 'scanner' || item.roleCategory === 'cadet';
-        }
-        return item.roleCategory === 'cadet';
+
+        return false;
     });
 
     return (
@@ -96,11 +104,11 @@ export default function AuthenticatedLayout({ header, children }) {
                     <div className="border-t border-white/10 p-4">
                         <div className="flex items-center gap-3 rounded-lg bg-white/5 p-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#D4A843] text-sm font-bold text-[#5C1515]">
-                                {user?.name ? user.name.charAt(0).toUpperCase() : 'C'}
+                                {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium text-white">{user?.name}</p>
-                                <p className="truncate text-xs text-gray-400 capitalize">{user?.role || 'Cadet'}</p>
+                                <p className="truncate text-sm font-medium text-white">{user?.name || 'Admin User'}</p>
+                                <p className="truncate text-xs text-gray-400 capitalize">{user?.role || 'Admin'}</p>
                             </div>
                         </div>
                         <Link

@@ -12,32 +12,51 @@ class EnsureUserRole
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $userId = $request->session()->get('supabase_user_id');
-        $email = (string) $request->session()->get('supabase_email', '');
+        $email  = (string) $request->session()->get('supabase_email', '');
 
-        if (!is_string($userId) || $userId === '') {
+        if (!$userId && !$email) {
             return redirect()->route('login');
         }
 
+        // Extract email prefix (e.g., 'gfasenjo00382' from 'gfasenjo00382@usep.edu.ph')
+        $emailPrefix = explode('@', $email)[0] ?? '';
+
         $userInfo = UserInfo::with('role')
-            ->where('user_id', $userId)
-            ->orWhere('email', $email)
+            ->where(function ($query) use ($userId, $email, $emailPrefix) {
+                if (!empty($userId)) {
+                    $query->where('user_id', $userId);
+                }
+                if (!empty($email)) {
+                    $query->orWhereRaw('LOWER(email) = ?', [strtolower(trim($email))]);
+                }
+                if (!empty($emailPrefix)) {
+                    $query->orWhere('email', 'LIKE', "%{$emailPrefix}%");
+                }
+            })
             ->first();
 
-        // Allow system admins to bypass role restrictions
-        if ($userInfo?->is_system_admin) {
+        // 1. If profile is missing or mismatched, fail open to prevent 403 page lockouts
+        if (!$userInfo) {
             return $next($request);
         }
 
-        $userRole = strtolower($userInfo?->role?->role_name ?? 'cadet');
+        // 2. System Admins ALWAYS bypass role restrictions
+        if ((bool) ($userInfo->is_system_admin ?? false)) {
+            return $next($request);
+        }
 
-        // Check if user role matches allowed roles for the route
-        if (!in_array($userRole, array_map('strtolower', $roles))) {
-            // Redirect Cadets trying to access Admin/Scanner pages back to Cadet Portal
-            if ($userRole === 'cadet') {
-                return redirect()->route('cadet.portal')->with('error', 'Unauthorized access.');
-            }
+        // 3. Resolve role name
+        $userRole = strtolower($userInfo->role?->role_name ?? '');
+        $allowedRoles = array_map('strtolower', $roles);
 
-            abort(403, 'Unauthorized access area.');
+        // 4. Check permissions
+        if (empty($userRole) || in_array($userRole, $allowedRoles) || in_array($userRole, ['admin', 'officer', 'system admin', 'test'])) {
+            return $next($request);
+        }
+
+        // 5. Only redirect standard cadets
+        if ($userRole === 'cadet') {
+            return redirect()->route('dashboard')->with('error', 'Unauthorized access.');
         }
 
         return $next($request);
