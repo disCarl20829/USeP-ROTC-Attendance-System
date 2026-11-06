@@ -3,7 +3,6 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 import { 
     ArrowDownTrayIcon, 
-    CalendarDaysIcon, 
     ChartBarIcon, 
     UsersIcon, 
     AcademicCapIcon,
@@ -15,29 +14,25 @@ import {
 
 export default function Reports({
     metrics = { averageAttendance: 0, totalEvents: 0, activeCadets: 0, totalEnrolled: 0, criticalAbsencesCount: 0 },
-    monthlyData = [],
+    sessions = [],
     cadetAttendanceList = []
 }) {
-    // Pagination & Search States
     const [searchQuery, setSearchQuery] = useState('');
     const [filterRiskOnly, setFilterRiskOnly] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(15);
 
-    const handleExport = () => {
-        window.print();
-    };
-
-    // Filter cadets efficiently with useMemo
     const filteredCadets = useMemo(() => {
         return cadetAttendanceList.filter((cadet) => {
             const nameStr = cadet.name || `${cadet.first_name || ''} ${cadet.last_name || ''}`;
-            const idStr = cadet.student_id || cadet.idNumber || cadet.student_id_number || '';
+            const idStr = cadet.student_id || cadet.student_id_number || '';
+            const programStr = cadet.program || cadet.course || '';
             const absences = cadet.absences || 0;
 
             const matchesSearch = 
                 nameStr.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                idStr.toLowerCase().includes(searchQuery.toLowerCase());
+                idStr.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                programStr.toLowerCase().includes(searchQuery.toLowerCase());
 
             const matchesRisk = filterRiskOnly ? absences >= 3 : true;
 
@@ -45,54 +40,71 @@ export default function Reports({
         });
     }, [cadetAttendanceList, searchQuery, filterRiskOnly]);
 
-    // Derived metric for 3+ absences if not directly passed in metrics prop
+    // Download formatted Excel export matching the exact ATTENDANCE layout
+    const handleExport = () => {
+        window.location.href = route('reports.export-excel');
+    };
+
+    // Color code helper matching exact Excel colors
+    const getCellColorClass = (val) => {
+        if (val == 10) return 'bg-[#92D050] text-gray-900 font-bold border border-gray-300'; // Green
+        if (val == 5) return 'bg-[#FFFF00] text-gray-900 font-bold border border-gray-300';  // Yellow
+        if (val == 8) return 'bg-[#BDD7EE] text-gray-900 font-bold border border-gray-300';  // Light Blue
+        if (val === 'A' || val == 0) return 'bg-[#FF0000] text-white font-bold border border-gray-300'; // Red
+        return 'bg-gray-50 text-gray-400 border border-gray-300';
+    };
+
     const criticalAbsences = useMemo(() => {
         if (metrics.criticalAbsencesCount !== undefined) return metrics.criticalAbsencesCount;
         return cadetAttendanceList.filter(c => (c.absences || 0) >= 3).length;
     }, [metrics.criticalAbsencesCount, cadetAttendanceList]);
 
-    // Lazy load / Slice rendering for pagination (renders only 10-50 DOM nodes at a time)
     const totalPages = Math.ceil(filteredCadets.length / pageSize) || 1;
     const paginatedCadets = useMemo(() => {
         const start = (currentPage - 1) * pageSize;
         return filteredCadets.slice(start, start + pageSize);
     }, [filteredCadets, currentPage, pageSize]);
 
-    const handlePageChange = (newPage) => {
-        if (newPage >= 1 && newPage <= totalPages) {
-            setCurrentPage(newPage);
+    // Format dates for table header
+    const formatDateHeader = (session, index) => {
+        if (session?.session_date) {
+            const d = new Date(session.session_date);
+            return `${d.getDate().toString().padStart(2, '0')}-${d.toLocaleString('en-US', { month: 'short' })}`;
         }
+        if (session?.title) return session.title;
+        return `S-${index + 1}`;
     };
 
+    const activeSessions = sessions.length > 0 
+        ? sessions 
+        : Array.from({ length: 19 }, (_, i) => ({ 
+            id: i + 1, 
+            session_number: i < 15 ? i + 1 : `F${i - 14}` 
+          }));
+
     return (
-        <AuthenticatedLayout header="Reports">
-            <Head title="Reports & Analytics" />
+        <AuthenticatedLayout header="Attendance Reports">
+            <Head title="Attendance Sheet" />
 
             {/* Top Bar */}
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Reports & Analytics</h2>
-                    <p className="text-sm text-gray-500">View attendance statistics, warnings, and comprehensive cadet records</p>
+                    <h2 className="text-2xl font-bold text-gray-900">USeP TAGUM UNIT — ATTENDANCE SHEET</h2>
+                    <p className="text-sm text-gray-500">Official Color-Coded Attendance Log (LE 1: 30%)</p>
                 </div>
                 <div className="flex gap-3">
-                    <select className="input-field w-auto rounded-md border-gray-300 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option>This Semester</option>
-                        <option>Last Semester</option>
-                        <option>This Academic Year</option>
-                    </select>
                     <button 
                         onClick={handleExport} 
-                        className="btn-primary flex items-center gap-2 bg-indigo-600 px-4 py-2 text-xs font-medium text-white rounded-md hover:bg-indigo-700 transition"
+                        className="btn-primary flex items-center gap-2 bg-[#7B1E1E] px-4 py-2 text-xs font-semibold text-white rounded-md hover:bg-[#5C1515] transition"
                     >
                         <ArrowDownTrayIcon className="h-4 w-4" />
-                        Export Report
+                        Export Official Attendance Excel
                     </button>
                 </div>
             </div>
 
-            {/* Metrics Summary Cards (4 Columns) */}
+            {/* Metrics Summary Cards */}
             <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {/* Total Enrolled */}
                 <div className="card p-5 bg-white shadow rounded-lg border border-gray-100">
                     <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
@@ -105,7 +117,6 @@ export default function Reports({
                     </div>
                 </div>
 
-                {/* Active Cadets */}
                 <div className="card p-5 bg-white shadow rounded-lg border border-gray-100">
                     <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
@@ -118,7 +129,6 @@ export default function Reports({
                     </div>
                 </div>
 
-                {/* Average Attendance */}
                 <div className="card p-5 bg-white shadow rounded-lg border border-gray-100">
                     <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#7B1E1E]/10 text-[#7B1E1E]">
@@ -131,7 +141,6 @@ export default function Reports({
                     </div>
                 </div>
 
-                {/* 3+ Absences Alert */}
                 <div className="card p-5 bg-white shadow rounded-lg border border-rose-100 bg-rose-50/30">
                     <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
@@ -145,43 +154,29 @@ export default function Reports({
                 </div>
             </div>
 
-            {/* Monthly Attendance Chart */}
-            <div className="mb-6 card p-6 bg-white shadow rounded-lg border border-gray-100">
-                <h3 className="mb-6 text-lg font-semibold text-gray-900">Monthly Attendance Trend</h3>
-                <div className="flex h-56 items-end justify-between gap-2 border-b border-gray-200 pb-2">
-                    {monthlyData.length === 0 ? (
-                        <div className="w-full flex justify-center items-center h-full text-sm text-gray-400">
-                            No monthly attendance data logged yet.
+            {/* Exact Excel ATTENDANCE Table Replica */}
+            <div className="card bg-white shadow rounded-lg border border-gray-300 overflow-hidden">
+                <div className="p-4 border-b border-gray-200 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-900">USeP TAGUM UNIT</h3>
+                            <p className="text-xs font-semibold text-gray-500">MALE &amp; FEMALE ROSTER</p>
                         </div>
-                    ) : (
-                        monthlyData.map((item, idx) => (
-                            <div key={idx} className="flex flex-1 flex-col items-center gap-2">
-                                <div className="relative w-full max-w-[40px] flex items-end h-40 bg-gray-50 rounded-t-lg">
-                                    <div
-                                        className="w-full rounded-t-lg bg-[#7B1E1E] transition-all duration-500"
-                                        style={{ height: `${item.attendance}%` }}
-                                    />
-                                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[11px] font-medium text-gray-600">
-                                        {item.attendance}%
-                                    </span>
-                                </div>
-                                <span className="text-xs text-gray-500 font-mono">{item.month}</span>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-
-            {/* Cadet Absences & Lates Detailed Table */}
-            <div className="card bg-white shadow rounded-lg border border-gray-100 overflow-hidden">
-                <div className="p-4 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h3 className="text-lg font-semibold text-gray-900">Cadet Attendance Log</h3>
-                        <p className="text-xs text-gray-500">Full summary of total lates and absences per cadet</p>
+                        {/* Legend */}
+                        <div className="flex items-center gap-3 text-xs border-l pl-4 border-gray-300">
+                            <span className="flex items-center gap-1 font-medium">
+                                <span className="w-3.5 h-3.5 bg-[#92D050] inline-block rounded-sm border border-gray-400"></span> 10 Present
+                            </span>
+                            <span className="flex items-center gap-1 font-medium">
+                                <span className="w-3.5 h-3.5 bg-[#FFFF00] inline-block rounded-sm border border-gray-400"></span> 5 Late
+                            </span>
+                            <span className="flex items-center gap-1 font-medium">
+                                <span className="w-3.5 h-3.5 bg-[#FF0000] inline-block rounded-sm border border-gray-400"></span> A Absent
+                            </span>
+                        </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        {/* Filter 3+ Absences toggle */}
                         <button
                             onClick={() => {
                                 setFilterRiskOnly(!filterRiskOnly);
@@ -196,13 +191,12 @@ export default function Reports({
                             {filterRiskOnly ? 'Showing 3+ Absences Only' : 'Filter 3+ Absences'}
                         </button>
 
-                        {/* Search Input */}
                         <div className="relative">
                             <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
                                 placeholder="Search cadet name or ID..."
-                                className="pl-9 pr-3 py-1.5 text-xs rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-56"
+                                className="pl-9 pr-3 py-1.5 text-xs rounded-md border-gray-300 shadow-sm focus:border-[#7B1E1E] focus:ring-[#7B1E1E] w-56"
                                 value={searchQuery}
                                 onChange={(e) => {
                                     setSearchQuery(e.target.value);
@@ -213,60 +207,68 @@ export default function Reports({
                     </div>
                 </div>
 
-                {/* Table */}
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                        <thead className="bg-gray-50 text-gray-600 uppercase font-semibold border-b border-gray-200">
-                            <tr>
-                                <th className="p-3.5">Cadet Name</th>
-                                <th className="p-3.5">Student ID</th>
-                                <th className="p-3.5">Course / Platoon</th>
-                                <th className="p-3.5 text-center">Total Lates</th>
-                                <th className="p-3.5 text-center">Total Absences</th>
-                                <th className="p-3.5 text-center">Status Warning</th>
+                    <table className="w-full text-left text-xs border-collapse font-sans">
+                        <thead>
+                            {/* Header Row 1: Banner */}
+                            <tr className="bg-[#84CAEB] text-gray-900 border-b border-gray-400 text-center font-bold">
+                                <th colSpan="2" className="p-2 border-r border-gray-400 text-center font-bold text-sm">USeP TAGUM UNIT</th>
+                                <th colSpan={activeSessions.length} className="p-2 border-r border-gray-400 text-center font-bold text-sm">LE 1: ATTENDANCE (30%)</th>
+                                <th className="p-2 bg-[#E7E773] text-gray-900 border-l border-gray-400 font-bold">TOTAL</th>
+                            </tr>
+                            {/* Header Row 2: Session Numbers */}
+                            <tr className="bg-[#E7E773] text-gray-900 border-b border-gray-400 text-center font-bold">
+                                <td colSpan="2" className="p-1.5 border-r border-gray-400 text-center font-bold">MALE &amp; FEMALE</td>
+                                {activeSessions.map((session, idx) => (
+                                    <td key={`snum-${session.id || idx}`} className="p-1 border-r border-gray-400 w-9">
+                                        {idx < 15 ? idx + 1 : `F${idx - 14}`}
+                                    </td>
+                                ))}
+                                <td className="p-1 font-bold"></td>
+                            </tr>
+                            {/* Header Row 3: Labels and Dates */}
+                            <tr className="bg-[#FFFFCC] text-gray-900 border-b-2 border-gray-400 font-bold">
+                                <th className="p-2 border-r border-gray-400 w-10 text-center">Nr.</th>
+                                <th className="p-2 border-r border-gray-400 min-w-[220px]">SURNAME, Given Name, MI</th>
+                                {activeSessions.map((session, idx) => (
+                                    <th key={`sdate-${session.id || idx}`} className="p-1.5 border-r border-gray-400 text-center font-mono text-[11px] w-9">
+                                        {formatDateHeader(session, idx)}
+                                    </th>
+                                ))}
+                                <th className="p-2 text-center w-14 font-bold">190</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-gray-300 font-sans">
                             {paginatedCadets.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="py-8 text-center text-sm text-gray-500">
-                                        No cadets found matching the query.
+                                    <td colSpan={activeSessions.length + 3} className="py-8 text-center text-sm text-gray-500">
+                                        No cadet attendance records found matching the filter.
                                     </td>
                                 </tr>
                             ) : (
-                                paginatedCadets.map((cadet) => {
-                                    const lates = cadet.lates || 0;
-                                    const absences = cadet.absences || 0;
-                                    const isCritical = absences >= 3;
-
+                                paginatedCadets.map((cadet, idx) => {
                                     return (
                                         <tr key={cadet.id || cadet.user_id} className="hover:bg-gray-50 transition">
-                                            <td className="p-3.5 font-semibold text-gray-900">
+                                            <td className="p-2 border-r border-gray-300 text-center font-mono font-bold text-gray-700">
+                                                {(currentPage - 1) * pageSize + idx + 1}
+                                            </td>
+                                            <td className="p-2 border-r border-gray-300 font-semibold text-gray-900">
                                                 {cadet.name || `${cadet.last_name}, ${cadet.first_name}`}
                                             </td>
-                                            <td className="p-3.5 text-gray-600 font-mono">
-                                                {cadet.student_id || cadet.idNumber || 'N/A'}
-                                            </td>
-                                            <td className="p-3.5 text-gray-600">
-                                                {cadet.course || cadet.platoon || 'N/A'}
-                                            </td>
-                                            <td className="p-3.5 text-center font-semibold text-amber-600">
-                                                {lates}
-                                            </td>
-                                            <td className="p-3.5 text-center font-semibold text-rose-600">
-                                                {absences}
-                                            </td>
-                                            <td className="p-3.5 text-center">
-                                                {isCritical ? (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
-                                                        <ExclamationTriangleIcon className="h-3 w-3" />
-                                                        3+ ABSENCES (DROPPED RISK)
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
-                                                        GOOD STANDING
-                                                    </span>
-                                                )}
+                                            {activeSessions.map((session, sIdx) => {
+                                                const sId = session.id ?? session.session_id ?? (sIdx + 1);
+                                                const val = cadet.matrix?.[sId] ?? 'A';
+                                                return (
+                                                    <td 
+                                                        key={`cell-${cadet.id}-${sId}`} 
+                                                        className={`p-1.5 text-center font-mono text-xs ${getCellColorClass(val)}`}
+                                                    >
+                                                        {val}
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="p-2 text-center font-mono font-bold text-gray-900 bg-[#FCE4D6] border-l border-gray-300">
+                                                {cadet.attendance_points ?? 0}
                                             </td>
                                         </tr>
                                     );
@@ -276,8 +278,8 @@ export default function Reports({
                     </table>
                 </div>
 
-                {/* Lazy-Loading Pagination Controls */}
-                <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
+                {/* Pagination Controls */}
+                <div className="p-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
                     <div className="flex items-center gap-2">
                         <span>Rows per page:</span>
                         <select
@@ -288,7 +290,7 @@ export default function Reports({
                             }}
                             className="input-field text-xs py-1 px-2 rounded border-gray-300"
                         >
-                            <option value={10}>10</option>
+                            <option value={15}>15</option>
                             <option value={25}>25</option>
                             <option value={50}>50</option>
                             <option value={100}>100</option>
@@ -301,7 +303,7 @@ export default function Reports({
 
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => handlePageChange(currentPage - 1)}
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                             disabled={currentPage === 1}
                             className="p-1.5 rounded-md border border-gray-300 disabled:opacity-40 hover:bg-gray-100 transition"
                         >
@@ -311,7 +313,7 @@ export default function Reports({
                             Page {currentPage} of {totalPages}
                         </span>
                         <button
-                            onClick={() => handlePageChange(currentPage + 1)}
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                             disabled={currentPage === totalPages}
                             className="p-1.5 rounded-md border border-gray-300 disabled:opacity-40 hover:bg-gray-100 transition"
                         >

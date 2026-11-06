@@ -58,6 +58,8 @@ Route::middleware('supabase.auth')->group(function () {
         Route::delete('/events/{id}', [EventController::class, 'destroy'])->name('events.destroy');
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports');
+        Route::get('/reports/export-excel', [ReportController::class, 'exportExcel'])->name('reports.export-excel'); // Added export route
+        
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
     });
 });
