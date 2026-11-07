@@ -279,7 +279,7 @@ export default function Reports({
                                 }}
                                 className="text-xs py-1.5 px-3 rounded-xl border-gray-200 bg-gray-50 font-bold shadow-2xs focus:ring-[#7B1E1E]"
                             >
-                                <option value={15}>15</option>
+                                <option value={15}>l5</option>
                                 <option value={25}>25</option>
                                 <option value={50}>50</option>
                                 <option value={100}>100</option>
