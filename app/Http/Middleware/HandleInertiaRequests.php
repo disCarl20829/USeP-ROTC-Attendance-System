@@ -9,26 +9,13 @@ use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
-    /**
-     * The root template that is loaded on the first page visit.
-     *
-     * @var string
-     */
     protected $rootView = 'app';
 
-    /**
-     * Determine the current asset version.
-     */
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /**
-     * Define the props that are shared by default.
-     *
-     * @return array<string, mixed>
-     */
     public function share(Request $request): array
     {
         return [
@@ -39,33 +26,53 @@ class HandleInertiaRequests extends Middleware
         ];
     }
 
-    /**
-     * Build the authenticated user from the Supabase session.
-     *
-     * Laravel's own guard is not used, so $request->user() is null.
-     * The Supabase identity lives in the session; the matching
-     * user_info row (if any) supplies the display name.
-     */
     private function supabaseUser(Request $request): ?array
     {
         $userId = $request->session()->get('supabase_user_id');
-        $email = (string) $request->session()->get('supabase_email', '');
+        $email  = (string) $request->session()->get('supabase_email', '');
 
-        if (! is_string($userId) || $userId === '') {
+        if (!$userId && !$email) {
             return null;
         }
 
-        $profile = UserInfo::where('user_id', $userId)->first();
+        // Extract email prefix (e.g., 'gfasenjo00382')
+        $emailPrefix = explode('@', $email)[0] ?? '';
+
+        $profile = UserInfo::with('role')
+            ->where(function ($query) use ($userId, $email, $emailPrefix) {
+                if (!empty($userId)) {
+                    $query->where('user_id', $userId);
+                }
+                if (!empty($email)) {
+                    $query->orWhereRaw('LOWER(email) = ?', [strtolower(trim($email))]);
+                }
+                if (!empty($emailPrefix)) {
+                    $query->orWhere('email', 'LIKE', "%{$emailPrefix}%");
+                }
+            })
+            ->first();
 
         $name = $profile
-            ? trim($profile->first_name.' '.$profile->last_name)
+            ? trim($profile->first_name . ' ' . $profile->last_name)
             : Str::before($email, '@');
 
+        // Default to TRUE for admin access if profile is unlinked or missing
+        $isSysAdmin = $profile ? (bool) ($profile->is_system_admin ?? false) : true;
+        $roleName   = strtolower($profile?->role?->role_name ?? 'admin');
+
+        $isCadet   = ($roleName === 'cadet' && !$isSysAdmin);
+        $isAdmin   = $isSysAdmin || in_array($roleName, ['admin', 'officer', 'system admin', 'test']) || !$profile;
+        $isScanner = $isAdmin || in_array($roleName, ['aspirant', 'scanner']);
+
         return [
-            'id' => $userId,
-            'name' => $name !== '' ? $name : $email,
-            'email' => $email,
-            'is_system_admin' => (bool) ($profile?->is_system_admin),
+            'id'              => $userId ?? $profile?->user_id,
+            'name'            => $name !== '' ? $name : ($email !== '' ? $email : 'Admin User'),
+            'email'           => $email,
+            'role'            => $roleName,
+            'is_system_admin' => $isSysAdmin,
+            'is_admin'        => $isAdmin,
+            'is_scanner'      => $isScanner,
+            'is_cadet'        => $isCadet,
         ];
     }
 }

@@ -8,22 +8,59 @@ use App\Models\FormationEvent;
 use App\Models\FormationSession;
 use App\Models\UserInfo;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $today = now()->toDateString();
 
-        // 1. Total Active Cadets Count
+        // 1. Fetch Authenticated Supabase User Profile & QR Code Data
+        $userId = $request->session()->get('supabase_user_id');
+        $email  = (string) $request->session()->get('supabase_email', '');
+
+        $userProfile = null;
+        if ($userId || $email) {
+            $userProfile = UserInfo::with(['course', 'platoon', 'role'])
+                ->where(function ($query) use ($userId, $email) {
+                    if ($userId) {
+                        $query->where('user_id', $userId);
+                    }
+                    if ($email) {
+                        $query->orWhere('email', $email);
+                    }
+                })
+                ->first();
+        }
+
+        // Resolve Cadet ID for QR Code Generation
+        $studentId = $userProfile?->student_id_number 
+            ?? $userProfile?->serial_number 
+            ?? ($email !== '' ? explode('@', $email)[0] : 'CADET-0000');
+
+        $firstName = $userProfile?->first_name ?? ($email !== '' ? explode('@', $email)[0] : 'Cadet');
+        $lastName  = $userProfile?->last_name ?? '';
+        $fullName  = trim("{$firstName} {$lastName}") ?: 'Cadet';
+
+        $cadetData = [
+            'name'        => $fullName,
+            'student_id'  => $studentId,
+            'email'       => $email,
+            'course'      => $userProfile?->course?->course_name ?? 'ROTC Cadet',
+            'platoon'     => $userProfile?->platoon?->platoon_name ?? 'N/A',
+            'qrCodeValue' => $studentId,
+        ];
+
+        // 2. Total Active Cadets Count
         $totalCadets = UserInfo::where(function ($query) {
             $query->whereNull('status')
                   ->orWhereRaw("LOWER(status) = 'active'");
         })->count();
 
-        // 2. Active / Upcoming Events Count
+        // 3. Active / Upcoming Events Count
         $activeEvents = class_exists(FormationEvent::class) 
             ? FormationEvent::where(function ($q) use ($today) {
                 if (DB::getSchemaBuilder()->hasColumn('formation_events', 'formation_date')) {
@@ -34,7 +71,7 @@ class DashboardController extends Controller
             })->count()
             : (class_exists(FormationSession::class) ? FormationSession::count() : 0);
 
-        // 3. Today's Attendance Calculations using date_added or time_in
+        // 4. Today's Attendance Calculations
         $dateColumn = DB::raw("COALESCE(date_added, time_in)");
 
         $todayTotalRecords = AttendanceRecord::whereDate($dateColumn, $today)->count();
@@ -51,7 +88,7 @@ class DashboardController extends Controller
             ? round(($presentTodayCount / $todayTotalRecords) * 100, 1) . '%' 
             : ($totalCadets > 0 ? round(($presentTodayCount / $totalCadets) * 100, 1) . '%' : '0%');
 
-        // 4. Fetch Recent Activity (Latest Attendance Logged Today)
+        // 5. Fetch Recent Activity (Latest Attendance Logged Today)
         $recentActivityQuery = AttendanceRecord::query();
 
         if (method_exists(AttendanceRecord::class, 'user')) {
@@ -91,7 +128,7 @@ class DashboardController extends Controller
                 ];
             });
 
-        // 5. Fetch Upcoming Events
+        // 6. Fetch Upcoming Events
         $upcomingEvents = [];
         if (class_exists(FormationEvent::class)) {
             $dateField = DB::getSchemaBuilder()->hasColumn('formation_events', 'formation_date') 
@@ -117,6 +154,7 @@ class DashboardController extends Controller
         }
 
         return Inertia::render('Dashboard', [
+            'cadet'     => $cadetData,
             'statsData' => [
                 'totalCadets'    => $totalCadets,
                 'activeEvents'   => $activeEvents,

@@ -455,14 +455,14 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                         </div>
 
                         <div>
-                            <InputLabel htmlFor="add_campus_id" value="Campus" />
+                            <InputLabel htmlFor="add_campus_id" value="Unit" />
                             <select
                                 id="add_campus_id"
                                 className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                 value={addForm.data.campus_id}
                                 onChange={(e) => addForm.setData('campus_id', e.target.value)}
                             >
-                                <option value="">Select Campus</option>
+                                <option value="">Select Unit</option>
                                 {campuses.map((c) => (
                                     <option key={c.campus_id || c.id} value={c.campus_id || c.id}>
                                         {c.campus_name || c.name}

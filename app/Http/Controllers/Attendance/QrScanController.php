@@ -35,6 +35,7 @@ class QrScanController extends Controller
         if ($events->isEmpty()) {
             $events = FormationSession::with('formation')
                 ->where('status', '!=', 'completed')
+                ->orWhereNull('status')
                 ->get();
         }
 
@@ -42,40 +43,44 @@ class QrScanController extends Controller
     }
 
     /**
-     * Scan Handler enforcing In/Out sequence and single-record database logging
+     * Scan Handler enforcing In/Out sequence and database logging
      */
     public function scan(ScanAttendanceRequest $request)
     {
         $validated = $request->validated();
         $rawInput  = trim($validated['student_id_number'] ?? $validated['student_id'] ?? '');
 
-        // Extract student ID pattern (e.g., 2026-00382)
+        // Extract student ID pattern (e.g., 2026-00382) or use raw string
         if (preg_match('/\d{4}-\d{4,6}/', $rawInput, $matches)) {
             $scannedId = $matches[0];
         } else {
             $scannedId = $rawInput;
         }
 
-        // 1. Locate Cadet in Database across all potential user ID fields
-        $query = UserInfo::where('email', 'LIKE', $scannedId . '@%')
-            ->orWhere('email', 'LIKE', '%' . $scannedId . '%');
-
-        if (\Schema::hasColumn('user_info', 'serial_number')) {
-            $query->orWhere('serial_number', $scannedId);
-        }
-        if (\Schema::hasColumn('user_info', 'student_id_number')) {
-            $query->orWhere('student_id_number', $scannedId);
-        }
-        if (Str::isUuid($scannedId)) {
-            $query->orWhere('user_id', $scannedId);
+        if (empty($scannedId)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'No valid Cadet ID or QR payload provided.',
+            ], 422);
         }
 
-        $userInfo = $query->first();
+        // 1. Locate Cadet across all database ID variations
+        $userInfo = UserInfo::where(function ($query) use ($scannedId, $rawInput) {
+            $query->where('student_id_number', $scannedId)
+                  ->orWhere('serial_number', $scannedId)
+                  ->orWhere('email', $scannedId)
+                  ->orWhere('email', 'LIKE', $scannedId . '@%')
+                  ->orWhere('email', 'LIKE', '%' . $rawInput . '%');
+
+            if (Str::isUuid($scannedId) || Str::isUuid($rawInput)) {
+                $query->orWhere('user_id', $scannedId)->orWhere('user_id', $rawInput);
+            }
+        })->first();
 
         if (!$userInfo) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Cadet with ID "' . $scannedId . '" not found in database.',
+                'message' => 'Cadet with ID "' . $scannedId . '" was not found in the database.',
             ], 404);
         }
 
@@ -85,35 +90,39 @@ class QrScanController extends Controller
         if (!$session) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Formation session not found.',
+                'message' => 'Selected formation session not found.',
             ], 404);
         }
 
         // Normalize scan type to 'In' or 'Out'
         $rawType  = $validated['scan_type'] ?? $validated['type'] ?? 'In';
-        $scanType = in_array(strtolower($rawType), ['in', 'entry']) ? 'In' : 'Out';
+        $scanType = in_array(strtolower($rawType), ['in', 'entry', 'scan in']) ? 'In' : 'Out';
 
-        // 3. Query existing attendance record for this exact cadet and session
-        $record = AttendanceRecord::where('user_id', $userInfo->user_id)
+        $cadetUserId = $userInfo->user_id ?? $userInfo->info_id;
+        $cadetName   = trim("{$userInfo->first_name} {$userInfo->last_name}") ?: 'Cadet';
+        $scannedBy   = $validated['scanned_by'] ?? $request->session()->get('supabase_email') ?? 'System Officer';
+
+        // 3. Query existing attendance record
+        $record = AttendanceRecord::where('user_id', $cadetUserId)
             ->where('session_id', $session->session_id)
             ->first();
 
         if (!$record) {
             $record = new AttendanceRecord([
-                'user_id'    => $userInfo->user_id,
+                'user_id'    => $cadetUserId,
                 'session_id' => $session->session_id,
             ]);
         }
 
         $now = Carbon::now('Asia/Manila');
-        $cadetName = trim("{$userInfo->first_name} {$userInfo->last_name}");
 
         // 4. Handle "IN" Scan Logic
         if ($scanType === 'In') {
             if ($record->exists && $record->time_in) {
+                $existingTime = Carbon::parse($record->time_in)->format('h:i A');
                 return response()->json([
                     'status'  => 'error',
-                    'message' => "Cadet {$cadetName} has already logged IN for this session.",
+                    'message' => "Cadet {$cadetName} already logged IN for this session at {$existingTime}.",
                 ], 422);
             }
 
@@ -126,12 +135,13 @@ class QrScanController extends Controller
 
             $record->time_in            = $now;
             $record->status             = $status;
-            $record->time_in_scanned_by = $validated['scanned_by'] ?? 'System Officer';
+            $record->date_added         = $record->date_added ?? $now;
+            $record->time_in_scanned_by = $scannedBy;
             $record->save();
 
             return response()->json([
-                'status'  => $status,
-                'message' => "Successfully logged IN for Cadet {$cadetName}",
+                'status'  => 'success',
+                'message' => "Logged IN: Cadet {$cadetName} ({$scannedId}) at " . $now->format('h:i A'),
                 'data'    => $record->load(['user', 'session']),
             ]);
         }
@@ -141,24 +151,25 @@ class QrScanController extends Controller
             if (!$record->exists || !$record->time_in) {
                 return response()->json([
                     'status'  => 'error',
-                    'message' => "Cannot log OUT. Cadet {$cadetName} has not logged IN for this session.",
+                    'message' => "Cannot log OUT: Cadet {$cadetName} has not logged IN for this session yet.",
                 ], 422);
             }
 
             if ($record->time_out) {
+                $existingOutTime = Carbon::parse($record->time_out)->format('h:i A');
                 return response()->json([
                     'status'  => 'error',
-                    'message' => "Cadet {$cadetName} has already logged OUT for this session.",
+                    'message' => "Cadet {$cadetName} already logged OUT at {$existingOutTime}.",
                 ], 422);
             }
 
             $record->time_out            = $now;
-            $record->time_out_scanned_by = $validated['scanned_by'] ?? 'System Officer';
+            $record->time_out_scanned_by = $scannedBy;
             $record->save();
 
             return response()->json([
                 'status'  => 'success',
-                'message' => "Successfully logged OUT for Cadet {$cadetName}",
+                'message' => "Logged OUT: Cadet {$cadetName} ({$scannedId}) at " . $now->format('h:i A'),
                 'data'    => $record->load(['user', 'session']),
             ]);
         }

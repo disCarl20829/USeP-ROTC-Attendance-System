@@ -1,5 +1,6 @@
+import { useRef } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import {
     UsersIcon,
     CalendarDaysIcon,
@@ -9,9 +10,35 @@ import {
     ClockIcon,
     CheckCircleIcon,
     XCircleIcon,
+    ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 
-export default function Dashboard({ statsData, recentActivity = [], upcomingEvents = [] }) {
+export default function Dashboard({ cadet = {}, statsData = {}, recentActivity = [], upcomingEvents = [] }) {
+    const { auth } = usePage().props;
+    const user = auth?.user;
+    const qrImageRef = useRef(null);
+
+    const qrValue = cadet?.qrCodeValue || cadet?.student_id || 'CADET-0000';
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrValue)}`;
+
+    const handleDownloadQR = async () => {
+        try {
+            const response = await fetch(qrImageUrl);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `ROTC_QR_${cadet.student_id || 'Cadet'}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+        } catch (error) {
+            console.error('Failed to download QR code:', error);
+        }
+    };
+
     // Dynamic Stat Cards
     const stats = [
         { 
@@ -51,7 +78,7 @@ export default function Dashboard({ statsData, recentActivity = [], upcomingEven
             {/* Stats Grid */}
             <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {stats.map((stat) => (
-                    <div key={stat.name} className="stat-card">
+                    <div key={stat.name} className="stat-card p-5 bg-white shadow rounded-lg border border-gray-200">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500">{stat.name}</p>
@@ -72,8 +99,37 @@ export default function Dashboard({ statsData, recentActivity = [], upcomingEven
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                {/* Recent Activity */}
-                <div className="card lg:col-span-2">
+                {/* Personal Digital Attendance QR Pass Card */}
+                <div className="card p-6 bg-white shadow rounded-lg border border-gray-200 flex flex-col items-center text-center">
+                    <div className="w-full border-b pb-3 mb-4 flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#7B1E1E] uppercase tracking-wider">ROTC Digital ID Pass</span>
+                        <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">ACTIVE</span>
+                    </div>
+
+                    <div className="p-3 bg-white border-2 border-dashed border-gray-300 rounded-xl mb-4 shadow-inner">
+                        <img 
+                            ref={qrImageRef}
+                            src={qrImageUrl} 
+                            alt={`QR Code for ${cadet.student_id}`}
+                            className="w-44 h-44 object-contain rounded-lg" 
+                        />
+                    </div>
+
+                    <h3 className="text-lg font-bold text-gray-900">{cadet.name || user?.name}</h3>
+                    <p className="text-sm font-mono text-gray-600 font-semibold">{cadet.student_id}</p>
+                    <p className="text-xs text-gray-500 mt-1">{cadet.course} • Platoon: {cadet.platoon}</p>
+
+                    <button
+                        onClick={handleDownloadQR}
+                        className="mt-5 w-full flex items-center justify-center gap-2 bg-[#7B1E1E] hover:bg-[#5C1515] text-white text-xs font-semibold py-2.5 px-4 rounded-lg shadow transition"
+                    >
+                        <ArrowDownTrayIcon className="h-4 w-4" />
+                        Download QR Code (PNG)
+                    </button>
+                </div>
+
+                {/* Recent Activity Table */}
+                <div className="card lg:col-span-2 bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
                     <div className="border-b border-gray-100 px-6 py-4">
                         <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
                         <p className="text-sm text-gray-500">Today's attendance records</p>
@@ -81,26 +137,26 @@ export default function Dashboard({ statsData, recentActivity = [], upcomingEven
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
-                                <tr>
-                                    <th className="table-header">Cadet</th>
-                                    <th className="table-header">Event</th>
-                                    <th className="table-header">Status</th>
-                                    <th className="table-header">Time</th>
+                                <tr className="border-b border-gray-100 bg-gray-50/50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                    <th className="px-6 py-3">Cadet</th>
+                                    <th className="px-6 py-3">Event</th>
+                                    <th className="px-6 py-3">Status</th>
+                                    <th className="px-6 py-3">Time</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-gray-100 text-sm">
                                 {recentActivity.length === 0 ? (
                                     <tr>
                                         <td colSpan="4" className="py-6 text-center text-sm text-gray-500">
-                                            No attendance records for today.
+                                            No attendance records logged for today.
                                         </td>
                                     </tr>
                                 ) : (
                                     recentActivity.map((record) => (
                                         <tr key={record.id} className="hover:bg-gray-50">
-                                            <td className="table-cell font-medium text-gray-900">{record.cadet}</td>
-                                            <td className="table-cell">{record.event}</td>
-                                            <td className="table-cell">
+                                            <td className="px-6 py-4 font-medium text-gray-900">{record.cadet}</td>
+                                            <td className="px-6 py-4 text-gray-600">{record.event}</td>
+                                            <td className="px-6 py-4">
                                                 <span
                                                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                                         record.status === 'present'
@@ -116,7 +172,7 @@ export default function Dashboard({ statsData, recentActivity = [], upcomingEven
                                                     {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
                                                 </span>
                                             </td>
-                                            <td className="table-cell text-gray-500">{record.time}</td>
+                                            <td className="px-6 py-4 text-gray-500 font-mono text-xs">{record.time}</td>
                                         </tr>
                                     ))
                                 )}
@@ -124,34 +180,34 @@ export default function Dashboard({ statsData, recentActivity = [], upcomingEven
                         </table>
                     </div>
                 </div>
+            </div>
 
-                {/* Upcoming Events */}
-                <div className="card">
-                    <div className="border-b border-gray-100 px-6 py-4">
-                        <h2 className="text-lg font-semibold text-gray-900">Upcoming Events</h2>
-                        <p className="text-sm text-gray-500">Next scheduled activities</p>
-                    </div>
-                    <div className="space-y-4 p-6">
-                        {upcomingEvents.length === 0 ? (
-                            <p className="text-center text-sm text-gray-500">No upcoming events scheduled.</p>
-                        ) : (
-                            upcomingEvents.map((event) => {
-                                const dateParts = event.date.split(' ');
-                                return (
-                                    <div key={event.id} className="flex gap-4 rounded-lg border border-gray-100 p-4 transition-colors hover:border-[#7B1E1E]/20 hover:bg-[#7B1E1E]/5">
-                                        <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg bg-[#7B1E1E] text-white">
-                                            <span className="text-xs font-medium">{dateParts[0]}</span>
-                                            <span className="text-lg font-bold leading-none">{dateParts[1]?.replace(',', '')}</span>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="font-medium text-gray-900">{event.name}</p>
-                                            <p className="text-sm text-gray-500">{event.time} • {event.location}</p>
-                                        </div>
+            {/* Upcoming Events Section */}
+            <div className="mt-6 card bg-white shadow rounded-lg border border-gray-200">
+                <div className="border-b border-gray-100 px-6 py-4">
+                    <h2 className="text-lg font-semibold text-gray-900">Upcoming Events</h2>
+                    <p className="text-sm text-gray-500">Next scheduled ROTC activities</p>
+                </div>
+                <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {upcomingEvents.length === 0 ? (
+                        <p className="col-span-full text-center text-sm text-gray-500 py-4">No upcoming events scheduled.</p>
+                    ) : (
+                        upcomingEvents.map((event) => {
+                            const dateParts = event.date.split(' ');
+                            return (
+                                <div key={event.id} className="flex gap-4 rounded-lg border border-gray-100 p-4 transition-colors hover:border-[#7B1E1E]/20 hover:bg-[#7B1E1E]/5">
+                                    <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg bg-[#7B1E1E] text-white">
+                                        <span className="text-xs font-medium">{dateParts[0]}</span>
+                                        <span className="text-lg font-bold leading-none">{dateParts[1]?.replace(',', '')}</span>
                                     </div>
-                                );
-                            })
-                        )}
-                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-medium text-gray-900">{event.name}</p>
+                                        <p className="text-sm text-gray-500">{event.time} • {event.location}</p>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
             </div>
         </AuthenticatedLayout>
