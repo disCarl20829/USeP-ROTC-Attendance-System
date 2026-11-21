@@ -108,7 +108,7 @@ class AuthController extends Controller
         $request->session()->put('pending_email', $email);
 
         return redirect()->route('register.verify')
-            ->with('status', 'Check your USeP email for the confirmation link.');
+            ->with('status', 'Check your USeP email for your verification code.');
     }
 
     /* ------------------------------------------------------------------ */
@@ -356,7 +356,7 @@ class AuthController extends Controller
         $request->session()->forget('password_reset_ready');
 
         return redirect()->route('password.reset')
-            ->with('status', 'If an account exists for that email, we sent a password reset link.');
+            ->with('status', 'If an account exists for that email, we sent a reset code and link.');
     }
 
     public function showReset(Request $request)

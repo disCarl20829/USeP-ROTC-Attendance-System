@@ -108,13 +108,9 @@ In the Supabase dashboard for **master-db**:
 3. **Authentication → URL Configuration → Site URL**: the app URL (when deploying).
 4. **Authentication → Providers → Email**: keep *Confirm email* **on**.
 
-**Email templates:** the default Supabase templates work as they are — their links go
-through Supabase and come back to `/auth/callback`. Optionally, add a 6-digit code to
-the *Confirm signup* and *Reset password* templates later; the app already accepts it:
-```html
-<p>Your code: <strong>{{ .Token }}</strong></p>
-<p><a href="{{ .ConfirmationURL }}">Or click here</a></p>
-```
+**Email templates:** branded maroon & gold templates with both a 6-digit code and a
+button link are in **[docs/email-templates/](email-templates/README.md)**. Paste them into
+Supabase → Authentication → Emails → Templates (*Confirm signup* and *Reset password*).
 
 ---
 

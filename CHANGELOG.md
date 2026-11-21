@@ -8,6 +8,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Branded maroon & gold Supabase email templates (code + button) in `docs/email-templates/`.
+
+### Changed
+- New events default to "Regular Formation" at "PECC Gym".
+
+### Added
 - **Middle name** (optional) at registration, setup, Settings and Cadets; the sheet shows the initial (MI).
 - **Whole-day events** create a morning and an afternoon session (2 sheet columns);
   half-day events pick one. Removing a session with attendance is blocked.

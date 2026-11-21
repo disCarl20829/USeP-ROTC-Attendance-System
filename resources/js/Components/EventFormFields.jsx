@@ -109,11 +109,11 @@ export default function EventFormFields({ form, prefix }) {
 export function emptyEvent(defaults = {}) {
     return {
         id: '',
-        formation_name: '',
+        formation_name: 'Regular Formation',
         formation_date: '',
         formation_type: 'half_day',
         half_session: 'morning',
-        location: '',
+        location: 'PECC Gym',
         morning_start: defaults.start_time ?? '06:30',
         morning_late: defaults.late_time ?? '07:00',
         morning_end: '12:00',

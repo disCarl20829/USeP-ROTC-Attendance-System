@@ -27,9 +27,8 @@ export default function VerifyEmail({ email }) {
             <StatusMessage />
 
             <p className="mb-4 text-sm text-gray-600">
-                We sent a confirmation email to <strong className="text-gray-900">{email}</strong>.{' '}
-                <strong>Click the link in the email</strong> to continue. If the email shows a 6-digit code, you can
-                enter it here instead.
+                We sent a confirmation email to <strong className="text-gray-900">{email}</strong>. Enter the{' '}
+                <strong>code</strong> from the email below, or click the <strong>Confirm my email</strong> button in it.
             </p>
 
             <form onSubmit={submit} className="space-y-4">
