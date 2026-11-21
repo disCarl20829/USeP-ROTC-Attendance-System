@@ -31,6 +31,7 @@ class SetupController extends Controller
             'email'    => $email,
             'prefill'  => [
                 'first_name'        => $existing?->first_name ?? ($meta['first_name'] ?? ''),
+                'middle_name'       => $existing?->middle_name ?? ($meta['middle_name'] ?? ''),
                 'last_name'         => $existing?->last_name ?? ($meta['last_name'] ?? ''),
                 'student_id'        => $existing?->student_id ?? '',
                 'campus_id'         => $existing?->campus_id,
@@ -55,6 +56,7 @@ class SetupController extends Controller
 
         $data = $request->validate([
             'first_name'        => ['required', 'string', 'max:255'],
+            'middle_name'       => ['nullable', 'string', 'max:255'],
             'last_name'         => ['required', 'string', 'max:255'],
             'student_id'        => LookupOptions::studentIdRules($existing?->info_id),
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
@@ -74,6 +76,7 @@ class SetupController extends Controller
             $profile->user_id           = $userId;
             $profile->email             = $email;
             $profile->first_name        = trim($data['first_name']);
+            $profile->middle_name       = trim((string) ($data['middle_name'] ?? '')) ?: null;
             $profile->last_name         = trim($data['last_name']);
             $profile->student_id        = trim($data['student_id']);
             $profile->campus_id         = $data['campus_id'];

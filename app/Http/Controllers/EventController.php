@@ -23,7 +23,9 @@ class EventController extends Controller
             ->orderByDesc('formation_date')
             ->get()
             ->map(function (FormationEvent $event) use ($totalCadets, $today) {
-                $session   = $event->sessions->sortBy('start_time')->first();
+                $sorted    = $event->sessions->sortBy('start_time')->values();
+                $session   = $sorted->first();
+                $last      = $sorted->last();
                 $attendees = AttendanceRecord::whereIn('session_id', $event->sessions->pluck('session_id'))
                     ->whereIn('status', ['present', 'late', 'excused'])
                     ->distinct('user_id')
@@ -36,7 +38,15 @@ class EventController extends Controller
                     'date'           => $event->formation_date?->format('M d, Y'),
                     'rawDate'        => $event->formation_date?->toDateString(),
                     'raw_date'       => $event->formation_date?->toDateString(),
-                    'time'           => $session?->start_time ? Carbon::parse($session->start_time)->format('h:i A') : 'TBA',
+                    'time'           => $session
+                        ? Carbon::parse($session->start_time)->format('h:i A') . ' – ' . Carbon::parse($last->end_time)->format('h:i A')
+                        : 'TBA',
+                    'sessions'       => $sorted->map(fn ($x) => [
+                        'type'       => $x->session_type,
+                        'start_time' => substr((string) $x->start_time, 0, 5),
+                        'late_time'  => substr((string) $x->late_time, 0, 5),
+                        'end_time'   => substr((string) $x->end_time, 0, 5),
+                    ])->all(),
                     'start_time'     => $session?->start_time ? substr($session->start_time, 0, 5) : '',
                     'end_time'       => $session?->end_time ? substr($session->end_time, 0, 5) : '',
                     'late_time'      => $session?->late_time ? substr($session->late_time, 0, 5) : '',
@@ -61,22 +71,50 @@ class EventController extends Controller
         ]);
     }
 
-    private function rules(): array
+    private function validated(Request $request): array
     {
-        return [
+        $whole = $request->input('formation_type') === 'whole_day';
+        $types = $whole ? ['morning', 'afternoon'] : [(string) $request->input('half_session', 'morning')];
+
+        $rules = [
             'formation_name' => ['required', 'string', 'max:255'],
             'formation_date' => ['required', 'date'],
             'formation_type' => ['required', 'in:whole_day,half_day'],
+            'half_session'   => ['required_if:formation_type,half_day', 'in:morning,afternoon'],
             'location'       => ['nullable', 'string', 'max:255'],
-            'start_time'     => ['required', 'date_format:H:i'],
-            'end_time'       => ['required', 'date_format:H:i', 'after:start_time'],
-            'late_time'      => ['required', 'date_format:H:i', 'after_or_equal:start_time', 'before_or_equal:end_time'],
+        ];
+
+        foreach ($types as $t) {
+            $rules["{$t}_start"] = ['required', 'date_format:H:i'];
+            $rules["{$t}_end"]   = ['required', 'date_format:H:i', "after:{$t}_start"];
+            $rules["{$t}_late"]  = ['required', 'date_format:H:i', "after_or_equal:{$t}_start", "before_or_equal:{$t}_end"];
+        }
+
+        if ($whole) {
+            $rules['afternoon_start'][] = 'after_or_equal:morning_end';
+        }
+
+        $data = $request->validate($rules, [
+            'afternoon_start.after_or_equal' => 'The afternoon session must start after the morning session ends.',
+        ]);
+
+        $data['session_types'] = $types;
+
+        return $data;
+    }
+
+    private function sessionValues(array $data, string $type): array
+    {
+        return [
+            'start_time' => $data["{$type}_start"],
+            'late_time'  => $data["{$type}_late"],
+            'end_time'   => $data["{$type}_end"],
         ];
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules());
+        $data = $this->validated($request);
 
         DB::transaction(function () use ($data, $request) {
             $event = FormationEvent::create([
@@ -87,13 +125,13 @@ class EventController extends Controller
                 'created_by'     => $request->session()->get('supabase_user_id'),
             ]);
 
-            FormationSession::create([
-                'formation_id' => $event->formation_id,
-                'session_type' => $data['start_time'] < '12:00' ? 'morning' : 'afternoon',
-                'start_time'   => $data['start_time'],
-                'end_time'     => $data['end_time'],
-                'late_time'    => $data['late_time'],
-            ]);
+            foreach ($data['session_types'] as $type) {
+                FormationSession::create([
+                    'formation_id' => $event->formation_id,
+                    'session_type' => $type,
+                    ...$this->sessionValues($data, $type),
+                ]);
+            }
         });
 
         return back()->with('success', 'Event created.');
@@ -102,9 +140,17 @@ class EventController extends Controller
     public function update(Request $request, int $id)
     {
         $event = FormationEvent::with('sessions')->findOrFail($id);
-        $data  = $request->validate($this->rules());
+        $data  = $this->validated($request);
 
-        DB::transaction(function () use ($event, $data) {
+        // Removing a session would delete its attendance; only allow it when empty.
+        $removed = $event->sessions->whereNotIn('session_type', $data['session_types']);
+        foreach ($removed as $session) {
+            if (AttendanceRecord::where('session_id', $session->session_id)->exists()) {
+                return back()->with('error', "The {$session->session_type} session already has attendance records and can't be removed.");
+            }
+        }
+
+        DB::transaction(function () use ($event, $data, $removed) {
             $event->update([
                 'formation_name' => $data['formation_name'],
                 'formation_date' => $data['formation_date'],
@@ -112,20 +158,16 @@ class EventController extends Controller
                 'location'       => $data['location'] ?? null,
             ]);
 
-            $session = $event->sessions->sortBy('start_time')->first();
-            $values  = [
-                'start_time' => $data['start_time'],
-                'end_time'   => $data['end_time'],
-                'late_time'  => $data['late_time'],
-            ];
+            foreach ($removed as $session) {
+                $session->delete();
+            }
 
-            $session
-                ? $session->update($values)
-                : FormationSession::create([
-                    'formation_id' => $event->formation_id,
-                    'session_type' => $data['start_time'] < '12:00' ? 'morning' : 'afternoon',
-                    ...$values,
-                ]);
+            foreach ($data['session_types'] as $type) {
+                FormationSession::updateOrCreate(
+                    ['formation_id' => $event->formation_id, 'session_type' => $type],
+                    $this->sessionValues($data, $type)
+                );
+            }
         });
 
         return back()->with('success', 'Event updated.');

@@ -34,8 +34,9 @@ class SettingsController extends Controller
         $canAssign = Permissions::allows($profile, 'cadets.assign');
 
         $data = $request->validate([
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name'  => ['required', 'string', 'max:255'],
+            'first_name'  => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'last_name'   => ['required', 'string', 'max:255'],
             'student_id' => LookupOptions::studentIdRules($profile->info_id),
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
             ...($canAssign ? [
@@ -45,9 +46,10 @@ class SettingsController extends Controller
         ]);
 
         $profile->fill([
-            'first_name' => trim($data['first_name']),
-            'last_name'  => trim($data['last_name']),
-            'student_id' => trim($data['student_id']),
+            'first_name'  => trim($data['first_name']),
+            'middle_name' => trim((string) ($data['middle_name'] ?? '')) ?: null,
+            'last_name'   => trim($data['last_name']),
+            'student_id'  => trim($data['student_id']),
             'campus_id'  => $data['campus_id'],
             'course_id'  => $data['course_id'],
         ]);

@@ -72,7 +72,8 @@ never stores passwords; it keeps the Supabase tokens in the Laravel session.
 | --- | --- | --- |
 | Register | `POST /register` | `signup` with first/last name as user metadata → `/register/verify` |
 | Verify (code) | `POST /register/verify` | `verify` (type `email`) → session stored → `/setup` |
-| Verify (link) | `GET /auth/confirm?token_hash=…&type=email` | same, from the email link |
+| Verify (default email link) | Supabase → `GET /auth/callback#access_token=…` | page posts the tokens to `POST /auth/callback`, which checks them with `GET /auth/v1/user` → `/setup` |
+| Verify (custom template link) | `GET /auth/confirm?token_hash=…&type=email` | same, for templates that use `{{ .TokenHash }}` |
 | Resend | `POST /register/resend` | `resend` (type `signup`) |
 | Setup | `POST /setup` | creates `user_info` (role Cadet) + QR token → `/dashboard` |
 | Login | `POST /login` | password grant; unverified emails are sent to the verify page |
@@ -90,26 +91,30 @@ to `/setup`. **Permissions:** `permission:<name>` (see `config/rotc.php`).
 
 In the Supabase dashboard for **master-db**:
 
-1. **Authentication → URL Configuration → Site URL**: the app URL
-   (e.g. `https://rotc.example.com`, or `http://127.0.0.1:8000` locally).
-2. **Authentication → Emails → Templates**
-   - *Confirm signup*:
-     ```html
-     <h2>Confirm your USeP ROTC account</h2>
-     <p>Your verification code is:</p>
-     <p style="font-size:28px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
-     <p>Or click: <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Confirm my email</a></p>
-     ```
-   - *Reset password*:
-     ```html
-     <h2>Reset your USeP ROTC password</h2>
-     <p>Your reset code is:</p>
-     <p style="font-size:28px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
-     <p>Or click: <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery">Reset my password</a></p>
-     ```
-3. **Authentication → Emails → SMTP Settings**: set up custom SMTP (e.g. a Gmail
-   app password, Resend, Brevo). The built-in mailer sends only a few emails per hour.
+1. **Authentication → URL Configuration → Redirect URLs**: add
+   `http://127.0.0.1:8000/auth/callback` (local) and later `https://<your domain>/auth/callback`.
+   Email links only return to the app if this URL is listed; otherwise Supabase falls
+   back to the Site URL.
+2. **Custom SMTP with Gmail** (the built-in mailer sends only a couple of emails an hour):
+   1. Create a dedicated Gmail account for the unit (e.g. a "USeP ROTC Attendance" address).
+   2. Google Account → **Security** → turn on **2-Step Verification**.
+   3. Google Account → **App passwords** (myaccount.google.com/apppasswords) → create one
+      named "Supabase" → copy the 16-character password.
+   4. Supabase → **Authentication → Emails → SMTP Settings** → enable custom SMTP:
+      - Sender email: the Gmail address · Sender name: `USeP ROTC Attendance`
+      - Host: `smtp.gmail.com` · Port: `465` · Username: the Gmail address
+      - Password: the app password (type it here only; never commit or share it)
+   5. **Authentication → Rate Limits**: raise "emails sent per hour" (Gmail allows ~500/day).
+3. **Authentication → URL Configuration → Site URL**: the app URL (when deploying).
 4. **Authentication → Providers → Email**: keep *Confirm email* **on**.
+
+**Email templates:** the default Supabase templates work as they are — their links go
+through Supabase and come back to `/auth/callback`. Optionally, add a 6-digit code to
+the *Confirm signup* and *Reset password* templates later; the app already accepts it:
+```html
+<p>Your code: <strong>{{ .Token }}</strong></p>
+<p><a href="{{ .ConfirmationURL }}">Or click here</a></p>
+```
 
 ---
 

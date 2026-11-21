@@ -8,6 +8,7 @@ import StatusMessage from '@/Components/StatusMessage';
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
         first_name: '',
+        middle_name: '',
         last_name: '',
         email: '',
         password: '',
@@ -28,7 +29,7 @@ export default function Register() {
             <StatusMessage />
 
             <form onSubmit={submit} className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <FormField id="first_name" label="First name" error={errors.first_name}>
                         <input
                             id="first_name"
@@ -38,6 +39,15 @@ export default function Register() {
                             autoComplete="given-name"
                             autoFocus
                             required
+                        />
+                    </FormField>
+                    <FormField id="middle_name" label="Middle name" error={errors.middle_name} hint="Optional">
+                        <input
+                            id="middle_name"
+                            value={data.middle_name}
+                            onChange={(e) => setData('middle_name', e.target.value)}
+                            className="input-field"
+                            autoComplete="additional-name"
                         />
                     </FormField>
                     <FormField id="last_name" label="Last name" error={errors.last_name}>

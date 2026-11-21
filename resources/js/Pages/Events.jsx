@@ -7,6 +7,7 @@ import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import { Head, useForm, router } from '@inertiajs/react';
+import EventFormFields, { emptyEvent, eventToForm } from '@/Components/EventFormFields';
 import { 
     PlusIcon, 
     CalendarDaysIcon, 
@@ -39,28 +40,8 @@ export default function Events({ events = [], defaults = {} }) {
     // Currently Selected Event Object
     const [selectedEvent, setSelectedEvent] = useState(null);
 
-    // 1. Create Event Form
-    const createForm = useForm({
-        formation_name: '',
-        formation_date: '',
-        formation_type: 'half_day',
-        location: 'PECC Gym',
-        start_time: defaults.start_time ?? '06:30',
-        end_time: defaults.end_time ?? '12:00',
-        late_time: defaults.late_time ?? '07:00', // after this, scans are marked Late
-    });
-
-    // 2. Edit Event Form
-    const editForm = useForm({
-        id: '',
-        formation_name: '',
-        formation_date: '',
-        formation_type: 'half_day',
-        location: '',
-        start_time: '',
-        end_time: '',
-        late_time: '',
-    });
+    const createForm = useForm(emptyEvent(defaults));
+    const editForm = useForm(emptyEvent(defaults));
 
     // Pagination Slice
     const totalPages = Math.ceil(rawEventsList.length / ITEMS_PER_PAGE) || 1;
@@ -92,16 +73,7 @@ export default function Events({ events = [], defaults = {} }) {
     const openEditModal = (event) => {
         setSelectedEvent(event);
         editForm.clearErrors();
-        editForm.setData({
-            id: event.id || event.session_id,
-            formation_name: event.name || event.formation_name || '',
-            formation_date: event.rawDate || event.formation_date || event.date || '',
-            formation_type: event.formation_type || event.session_type || 'half_day',
-            location: event.location || 'PECC Gym',
-            start_time: event.start_time || '06:30',
-            end_time: event.end_time || '12:00',
-            late_time: event.late_time || '07:00',
-        });
+        editForm.setData(eventToForm(event, defaults));
         setIsEditModalOpen(true);
     };
 
@@ -313,98 +285,7 @@ export default function Events({ events = [], defaults = {} }) {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div className="sm:col-span-2">
-                            <InputLabel htmlFor="create_formation_name" value="Event Name" />
-                            <TextInput
-                                id="create_formation_name"
-                                type="text"
-                                className="mt-1 block w-full text-sm"
-                                value={createForm.data.formation_name}
-                                onChange={(e) => createForm.setData('formation_name', e.target.value)}
-                                placeholder="e.g. Morning Formation Session"
-                                required
-                            />
-                            <InputError message={createForm.errors.formation_name} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="create_formation_date" value="Date" />
-                            <TextInput
-                                id="create_formation_date"
-                                type="date"
-                                className="mt-1 block w-full text-sm"
-                                value={createForm.data.formation_date}
-                                onChange={(e) => createForm.setData('formation_date', e.target.value)}
-                                required
-                            />
-                            <InputError message={createForm.errors.formation_date} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="create_formation_type" value="Event Duration / Type" />
-                            <select
-                                id="create_formation_type"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                value={createForm.data.formation_type}
-                                onChange={(e) => createForm.setData('formation_type', e.target.value)}
-                            >
-                                <option value="half_day">Half Day</option>
-                                <option value="whole_day">Whole Day</option>
-                            </select>
-                            <InputError message={createForm.errors.formation_type} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="create_location" value="Location" />
-                            <TextInput
-                                id="create_location"
-                                type="text"
-                                className="mt-1 block w-full text-sm"
-                                value={createForm.data.location}
-                                onChange={(e) => createForm.setData('location', e.target.value)}
-                                placeholder="e.g. PECC Gym / Parade Ground"
-                            />
-                            <InputError message={createForm.errors.location} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="create_start_time" value="Start Time" />
-                            <TextInput
-                                id="create_start_time"
-                                type="time"
-                                className="mt-1 block w-full text-sm"
-                                value={createForm.data.start_time}
-                                onChange={(e) => createForm.setData('start_time', e.target.value)}
-                            />
-                            <InputError message={createForm.errors.start_time} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="create_end_time" value="End Time" />
-                            <TextInput
-                                id="create_end_time"
-                                type="time"
-                                className="mt-1 block w-full text-sm"
-                                value={createForm.data.end_time}
-                                onChange={(e) => createForm.setData('end_time', e.target.value)}
-                            />
-                            <InputError message={createForm.errors.end_time} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="create_late_time" value="Late Cutoff Timestamp (Late Threshold)" />
-                            <TextInput
-                                id="create_late_time"
-                                type="time"
-                                className="mt-1 block w-full text-sm border-amber-300 focus:border-amber-500 focus:ring-amber-500"
-                                value={createForm.data.late_time}
-                                onChange={(e) => createForm.setData('late_time', e.target.value)}
-                            />
-                            <p className="mt-1 text-[11px] text-amber-700">Scans after this time will automatically mark cadets as "Late".</p>
-                            <InputError message={createForm.errors.late_time} className="mt-1" />
-                        </div>
-                    </div>
+                    <EventFormFields form={createForm} prefix="create" />
 
                     <div className="mt-6 flex justify-end gap-3 border-t pt-4">
                         <SecondaryButton onClick={closeCreateModal}>Cancel</SecondaryButton>
@@ -423,96 +304,7 @@ export default function Events({ events = [], defaults = {} }) {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div className="sm:col-span-2">
-                            <InputLabel htmlFor="edit_formation_name" value="Event Name" />
-                            <TextInput
-                                id="edit_formation_name"
-                                type="text"
-                                className="mt-1 block w-full text-sm"
-                                value={editForm.data.formation_name}
-                                onChange={(e) => editForm.setData('formation_name', e.target.value)}
-                                required
-                            />
-                            <InputError message={editForm.errors.formation_name} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="edit_formation_date" value="Date" />
-                            <TextInput
-                                id="edit_formation_date"
-                                type="date"
-                                className="mt-1 block w-full text-sm"
-                                value={editForm.data.formation_date}
-                                onChange={(e) => editForm.setData('formation_date', e.target.value)}
-                                required
-                            />
-                            <InputError message={editForm.errors.formation_date} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="edit_formation_type" value="Event Duration / Type" />
-                            <select
-                                id="edit_formation_type"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                                value={editForm.data.formation_type}
-                                onChange={(e) => editForm.setData('formation_type', e.target.value)}
-                            >
-                                <option value="half_day">Half Day</option>
-                                <option value="whole_day">Whole Day</option>
-                            </select>
-                            <InputError message={editForm.errors.formation_type} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="edit_location" value="Location" />
-                            <TextInput
-                                id="edit_location"
-                                type="text"
-                                className="mt-1 block w-full text-sm"
-                                value={editForm.data.location}
-                                onChange={(e) => editForm.setData('location', e.target.value)}
-                            />
-                            <InputError message={editForm.errors.location} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="edit_start_time" value="Start Time" />
-                            <TextInput
-                                id="edit_start_time"
-                                type="time"
-                                className="mt-1 block w-full text-sm"
-                                value={editForm.data.start_time}
-                                onChange={(e) => editForm.setData('start_time', e.target.value)}
-                            />
-                            <InputError message={editForm.errors.start_time} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="edit_end_time" value="End Time" />
-                            <TextInput
-                                id="edit_end_time"
-                                type="time"
-                                className="mt-1 block w-full text-sm"
-                                value={editForm.data.end_time}
-                                onChange={(e) => editForm.setData('end_time', e.target.value)}
-                            />
-                            <InputError message={editForm.errors.end_time} className="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="edit_late_time" value="Late Cutoff Timestamp (Late Threshold)" />
-                            <TextInput
-                                id="edit_late_time"
-                                type="time"
-                                className="mt-1 block w-full text-sm border-amber-300 focus:border-amber-500 focus:ring-amber-500"
-                                value={editForm.data.late_time}
-                                onChange={(e) => editForm.setData('late_time', e.target.value)}
-                            />
-                            <p className="mt-1 text-[11px] text-amber-700">Scans after this time will automatically mark cadets as "Late".</p>
-                            <InputError message={editForm.errors.late_time} className="mt-1" />
-                        </div>
-                    </div>
+                    <EventFormFields form={editForm} prefix="edit" />
 
                     <div className="mt-6 flex justify-end gap-3 border-t pt-4">
                         <SecondaryButton onClick={closeEditModal}>Cancel</SecondaryButton>

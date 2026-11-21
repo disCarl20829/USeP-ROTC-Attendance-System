@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Head, Link } from '@inertiajs/react';
 
 function ShieldIcon({ className = 'h-10 w-10' }) {
@@ -32,7 +33,15 @@ function ChartIcon({ className = 'h-8 w-8' }) {
     );
 }
 
-export default function Welcome({ auth, laravelVersion, phpVersion }) {
+export default function Welcome({ auth }) {
+    // If Supabase sent an email link back to the home page (Site URL fallback),
+    // hand the tokens to the callback page.
+    useEffect(() => {
+        if (/access_token=|error_description=/.test(window.location.hash)) {
+            window.location.replace('/auth/callback' + window.location.hash);
+        }
+    }, []);
+
     return (
         <>
             <Head title="Welcome" />

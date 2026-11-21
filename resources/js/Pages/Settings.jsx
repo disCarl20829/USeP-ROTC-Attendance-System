@@ -7,6 +7,7 @@ export default function Settings({ profile = {}, utility = {}, options = {}, can
 
     const profileForm = useForm({
         first_name: profile.first_name ?? '',
+        middle_name: profile.middle_name ?? '',
         last_name: profile.last_name ?? '',
         student_id: profile.student_id ?? '',
         campus_id: str(profile.campus_id),
@@ -71,6 +72,15 @@ export default function Settings({ profile = {}, utility = {}, options = {}, can
                                     onChange={(e) => profileForm.setData('last_name', e.target.value)}
                                     className="input-field"
                                     required
+                                />
+                            </FormField>
+                            <FormField id="middle_name" label="Middle name" error={pe.middle_name} hint="Optional">
+                                <input
+                                    id="middle_name"
+                                    value={pd.middle_name}
+                                    onChange={(e) => profileForm.setData('middle_name', e.target.value)}
+                                    className="input-field"
+                                    autoComplete="additional-name"
                                 />
                             </FormField>
                             <FormField id="student_id" label="Student ID" error={pe.student_id}>

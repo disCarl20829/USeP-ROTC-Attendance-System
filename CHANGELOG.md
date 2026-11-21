@@ -7,6 +7,24 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Middle name** (optional) at registration, setup, Settings and Cadets; the sheet shows the initial (MI).
+- **Whole-day events** create a morning and an afternoon session (2 sheet columns);
+  half-day events pick one. Removing a session with attendance is blocked.
+- **Excel export is a real .xlsx** (PhpSpreadsheet) in the unit's format: "All" sheet +
+  one sheet per platoon; NR · SURNAME · FIRSTNAME · MI · 1–15 · TOTAL (150); green /
+  orange / blue / red cells; dropped cadets in red with blank cells after the drop date;
+  session date and name as a note on each header.
+- **Drop dates:** `dropped_at` and `active_since`. Re-enrolled cadets are not auto-marked
+  absent for sessions missed while dropped.
+- Works with **Supabase's default email templates**: email links return to
+  `/auth/callback`, which verifies the tokens with Supabase and continues sign-up or
+  password reset. Expired links show a clear message.
+
+### Changed
+- Attendance (roster, reports, auto-absent) covers **Cadets and Aspirants**.
+- Reports page always shows at least 15 numbered columns; dropped cadets in red.
+
 ## [0.5.0] — 2026-11-21
 
 ### Added

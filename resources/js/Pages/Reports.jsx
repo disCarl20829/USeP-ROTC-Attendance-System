@@ -72,11 +72,12 @@ export default function Reports({
             const d = new Date(session.session_date);
             return `${d.getDate().toString().padStart(2, '0')}-${d.toLocaleString('en-US', { month: 'short' })}`;
         }
-        if (session?.title) return session.title;
-        return `S-${index + 1}`;
+        return '—';
     };
 
-    const activeSessions = sessions;
+    // Always show at least 15 numbered columns, like the official sheet.
+    const columnCount = Math.max(metrics.columns ?? 15, sessions.length);
+    const activeSessions = Array.from({ length: columnCount }, (_, i) => sessions[i] ?? { id: `empty-${i}`, number: i + 1, empty: true });
 
     return (
         <AuthenticatedLayout header="Attendance Reports">
@@ -217,7 +218,7 @@ export default function Reports({
                                     <th className="py-2.5 px-3 border-r border-gray-200 w-12 text-center">Nr.</th>
                                     <th className="py-2.5 px-4 border-r border-gray-200 min-w-[220px]">SURNAME, Given Name, MI</th>
                                     {activeSessions.map((session, idx) => (
-                                        <th key={`sdate-${session.id || idx}`} className="py-2.5 px-1 border-r border-gray-200 text-center font-mono text-[10px] text-gray-500 w-9">
+                                        <th key={`sdate-${session.id || idx}`} title={session.title ?? ''} className="py-2.5 px-1 border-r border-gray-200 text-center font-mono text-[10px] text-gray-500 w-9">
                                             {formatDateHeader(session, idx)}
                                         </th>
                                     ))}
@@ -238,15 +239,16 @@ export default function Reports({
                                                 <td className="py-3 px-3 border-r border-gray-100 text-center font-mono font-bold text-gray-500">
                                                     {(currentPage - 1) * pageSize + idx + 1}
                                                 </td>
-                                                <td className="py-3 px-4 border-r border-gray-100 font-bold text-gray-900">
+                                                <td className={`py-3 px-4 border-r border-gray-100 font-bold ${cadet.status === 'dropped' ? 'text-red-600' : 'text-gray-900'}`}>
                                                     {cadet.name || `${cadet.last_name}, ${cadet.first_name}`}
                                                     <span className="block text-[10px] font-mono text-gray-400 font-normal">
-                                                        {cadet.student_id} • {cadet.program}
+                                                        {cadet.student_id} • {cadet.platoon ?? 'Unassigned'}
+                                                        {cadet.status === 'dropped' && ` • DROPPED ${cadet.dropped_at ?? ''}`}
                                                     </span>
                                                 </td>
                                                 {activeSessions.map((session, sIdx) => {
-                                                    const sId = session.id ?? session.session_id ?? (sIdx + 1);
-                                                    const val = cadet.matrix?.[sId] ?? '';
+                                                    const sId = session.id;
+                                                    const val = session.empty ? '' : cadet.matrix?.[sId] ?? '';
                                                     return (
                                                         <td 
                                                             key={`cell-${cadet.id}-${sId}`} 

@@ -24,21 +24,20 @@ Legend: `P0` = needed before real use · `P1` = next up · `P2` = important · `
 
 ## P0 — Before real users
 
-- [ ] **Supabase dashboard settings** (see GUIDE → Supabase Auth setup):
-      Site URL, *Confirm signup* + *Reset password* email templates, **custom SMTP**
-- [ ] Run `php artisan rotc:make-admin <email>` for the first admin
-- [ ] **Excel export layout**: match the official sample spreadsheet (waiting on the sample)
+- [ ] **Supabase dashboard:** Redirect URL `<APP_URL>/auth/callback`, **Gmail SMTP**
+      (see GUIDE → Supabase Auth setup); Site URL when deploying
+- [ ] Make caupepito00107@usep.edu.ph Admin after they finish setup
 - [ ] Deploy over **HTTPS** (camera scanning needs it)
+- [ ] `composer update` — `composer audit` reports 9 advisories in laravel/framework
+      and symfony packages (existing dependencies)
 
 ## P1 — Next up
 
-- [ ] Whole-day events: create/edit separate morning **and** afternoon sessions in the UI
-- [ ] Decide whether Aspirants (or other roles) should also be auto-marked absent
-      (`mark_absent_cadets()` only covers Cadets)
+- [ ] "ODDRM" special-event column on the sheet (on hold)
+- [ ] Optional: custom email templates with a 6-digit code (the code input already works)
 - [ ] Change status from the Attendance roster (currently only from the scanner prompt)
 - [ ] Admin page to manage lookup lists (campuses, courses, platoons, specializations)
 - [ ] Regenerate a cadet's QR token if it leaks
-- [ ] Commit an `.env.example` (mentioned as added on the desktop, not in the repo yet)
 
 ## P2 — Quality
 

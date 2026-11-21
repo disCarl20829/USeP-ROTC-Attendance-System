@@ -69,9 +69,10 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $data = $request->validate([
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name'  => ['required', 'string', 'max:255'],
-            'email'      => $this->emailRules(),
+            'first_name'  => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'last_name'   => ['required', 'string', 'max:255'],
+            'email'       => $this->emailRules(),
             'password'   => $this->newPasswordRules(),
         ]);
 
@@ -79,8 +80,9 @@ class AuthController extends Controller
 
         try {
             $response = $this->supabase->signUp($email, $data['password'], [
-                'first_name' => trim($data['first_name']),
-                'last_name'  => trim($data['last_name']),
+                'first_name'  => trim($data['first_name']),
+                'middle_name' => trim((string) ($data['middle_name'] ?? '')),
+                'last_name'   => trim($data['last_name']),
             ]);
         } catch (ConnectionException) {
             Log::error('Supabase signup connection failed.');
@@ -106,7 +108,7 @@ class AuthController extends Controller
         $request->session()->put('pending_email', $email);
 
         return redirect()->route('register.verify')
-            ->with('status', 'We sent a 6-digit code and a confirmation link to your USeP email.');
+            ->with('status', 'Check your USeP email for the confirmation link.');
     }
 
     /* ------------------------------------------------------------------ */
@@ -202,6 +204,49 @@ class AuthController extends Controller
         Supabase::storeSession($request, $response);
 
         if ($type === 'recovery') {
+            $request->session()->put('password_reset_ready', true);
+
+            return redirect()->route('password.reset');
+        }
+
+        return redirect()->route('setup')->with('success', 'Email verified! Finish setting up your account.');
+    }
+
+    /**
+     * Supabase's default email links come back as /auth/callback#access_token=…&type=signup|recovery.
+     * The page (Auth/Callback) posts the tokens here; we verify them with Supabase before trusting them.
+     */
+    public function showCallback()
+    {
+        return Inertia::render('Auth/Callback');
+    }
+
+    public function completeCallback(Request $request)
+    {
+        $data = $request->validate([
+            'access_token'  => ['required', 'string', 'max:4096'],
+            'refresh_token' => ['required', 'string', 'max:512'],
+            'expires_in'    => ['nullable', 'integer', 'min:0', 'max:86400'],
+            'type'          => ['nullable', 'string', 'in:signup,email,recovery,magiclink,invite,email_change'],
+        ]);
+
+        try {
+            $user = $this->supabase->getUser($data['access_token']);
+        } catch (ConnectionException) {
+            return redirect()->route('login')->withErrors(['email' => self::UNAVAILABLE]);
+        }
+
+        $email = strtolower((string) $user->json('email'));
+
+        if (!$user->successful() || !is_string($user->json('id')) || !preg_match('/^[^@\s]+@usep\.edu\.ph$/i', $email)) {
+            return redirect()->route('login')->withErrors(['email' => 'That link is invalid or has expired.']);
+        }
+
+        $request->session()->regenerate();
+        $request->session()->forget('pending_email');
+        Supabase::storeTokens($request, $data['access_token'], $data['refresh_token'], (int) ($data['expires_in'] ?? 3600), (array) $user->json());
+
+        if (($data['type'] ?? '') === 'recovery') {
             $request->session()->put('password_reset_ready', true);
 
             return redirect()->route('password.reset');
@@ -311,7 +356,7 @@ class AuthController extends Controller
         $request->session()->forget('password_reset_ready');
 
         return redirect()->route('password.reset')
-            ->with('status', 'If an account exists for that email, we sent a 6-digit code and a reset link.');
+            ->with('status', 'If an account exists for that email, we sent a password reset link.');
     }
 
     public function showReset(Request $request)

@@ -39,9 +39,20 @@ class Supabase
             ->timeout(15);
     }
 
+    /** Where Supabase's email links send the user back (must be in Auth → URL Configuration → Redirect URLs). */
+    public static function callbackUrl(): string
+    {
+        return rtrim((string) config('app.url'), '/') . '/auth/callback';
+    }
+
+    private function withRedirect(string $path): string
+    {
+        return $path . '?redirect_to=' . urlencode(self::callbackUrl());
+    }
+
     public function signUp(string $email, string $password, array $meta): Response
     {
-        return $this->client()->post('/auth/v1/signup', [
+        return $this->client()->post($this->withRedirect('/auth/v1/signup'), [
             'email'    => $email,
             'password' => $password,
             'data'     => $meta,
@@ -84,7 +95,7 @@ class Supabase
 
     public function resendSignup(string $email): Response
     {
-        return $this->client()->post('/auth/v1/resend', [
+        return $this->client()->post($this->withRedirect('/auth/v1/resend'), [
             'type'  => 'signup',
             'email' => $email,
         ]);
@@ -92,7 +103,7 @@ class Supabase
 
     public function sendPasswordReset(string $email): Response
     {
-        return $this->client()->post('/auth/v1/recover', ['email' => $email]);
+        return $this->client()->post($this->withRedirect('/auth/v1/recover'), ['email' => $email]);
     }
 
     public function updatePassword(string $accessToken, string $password): Response
@@ -129,15 +140,25 @@ class Supabase
             $request->session()->regenerate();
         }
 
+        self::storeTokens(
+            $request,
+            (string) $response->json('access_token'),
+            (string) $response->json('refresh_token'),
+            (int) $response->json('expires_in', 3600),
+            (array) $response->json('user', [])
+        );
+    }
+
+    /** Store tokens + the verified user (from /auth/v1/user or a token response). */
+    public static function storeTokens(Request $request, string $accessToken, string $refreshToken, int $expiresIn, array $user): void
+    {
         $request->session()->put([
-            'supabase_access_token'     => $response->json('access_token'),
-            'supabase_refresh_token'    => $response->json('refresh_token'),
-            'supabase_user_id'          => $response->json('user.id'),
-            'supabase_email'            => strtolower((string) $response->json('user.email')),
-            'supabase_user_meta'        => (array) $response->json('user.user_metadata', []),
-            'supabase_token_expires_at' => now()->addSeconds(
-                max(0, (int) $response->json('expires_in', 3600))
-            )->timestamp,
+            'supabase_access_token'     => $accessToken,
+            'supabase_refresh_token'    => $refreshToken,
+            'supabase_user_id'          => (string) ($user['id'] ?? ''),
+            'supabase_email'            => strtolower((string) ($user['email'] ?? '')),
+            'supabase_user_meta'        => (array) ($user['user_metadata'] ?? []),
+            'supabase_token_expires_at' => now()->addSeconds(max(0, $expiresIn))->timestamp,
         ]);
     }
 

@@ -35,6 +35,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
     // Add Cadet Form
     const addForm = useForm({
         first_name: '',
+        middle_name: '',
         last_name: '',
         student_id: '',
         email: '',
@@ -49,6 +50,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
     // Edit Cadet Form
     const editForm = useForm({
         first_name: '',
+        middle_name: '',
         last_name: '',
         student_id: '',
         email: '',
@@ -102,6 +104,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
         setEditingCadetId(id);
         editForm.setData({
             first_name: cadet.firstName || cadet.first_name || '',
+            middle_name: cadet.middleName || cadet.middle_name || '',
             last_name: cadet.lastName || cadet.last_name || '',
             student_id: cadet.idNumber || cadet.student_id || '',
             email: cadet.email || '',
@@ -423,6 +426,18 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                         </div>
 
                         <div>
+                            <InputLabel htmlFor="add_middle_name" value="Middle Name (optional)" />
+                            <TextInput
+                                id="add_middle_name"
+                                type="text"
+                                className="mt-1 block w-full text-sm"
+                                value={addForm.data.middle_name}
+                                onChange={(e) => addForm.setData('middle_name', e.target.value)}
+                            />
+                            <InputError message={addForm.errors.middle_name} className="mt-1" />
+                        </div>
+
+                        <div>
                             <InputLabel htmlFor="add_student_id" value="Student ID Number" />
                             <TextInput
                                 id="add_student_id"
@@ -585,6 +600,18 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                                 required
                             />
                             <InputError message={editForm.errors.last_name} className="mt-1" />
+                        </div>
+
+                        <div>
+                            <InputLabel htmlFor="edit_middle_name" value="Middle Name (optional)" />
+                            <TextInput
+                                id="edit_middle_name"
+                                type="text"
+                                className="mt-1 block w-full text-sm"
+                                value={editForm.data.middle_name}
+                                onChange={(e) => editForm.setData('middle_name', e.target.value)}
+                            />
+                            <InputError message={editForm.errors.middle_name} className="mt-1" />
                         </div>
 
                         <div>

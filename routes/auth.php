@@ -22,6 +22,8 @@ Route::post('/forgot-password', [AuthController::class, 'sendReset'])->middlewar
 // Email links (sign-up confirmation and password reset). Not guest-only:
 // the link may be opened in a browser that is already logged in.
 Route::get('/auth/confirm', [AuthController::class, 'confirmLink'])->middleware('throttle:otp')->name('auth.confirm');
+Route::get('/auth/callback', [AuthController::class, 'showCallback'])->name('auth.callback');
+Route::post('/auth/callback', [AuthController::class, 'completeCallback'])->middleware('throttle:otp')->name('auth.callback.store');
 
 // Reset password: enter code -> set new password (user is logged in after the code/link).
 Route::get('/reset-password', [AuthController::class, 'showReset'])->name('password.reset');

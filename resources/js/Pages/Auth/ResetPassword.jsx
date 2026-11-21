@@ -32,7 +32,7 @@ export default function ResetPassword({ email = '', ready = false }) {
                 <>
                     <h2 className="mb-1 text-lg font-bold text-gray-900">Enter your reset code</h2>
                     <p className="mb-6 text-sm text-gray-600">
-                        Type the 6-digit code from the email, or just click the reset link in it.
+                        Click the reset link in the email we sent. If the email shows a 6-digit code, enter it here.
                     </p>
                     <form onSubmit={submitCode} className="space-y-4">
                         <FormField id="email" label="USeP email" error={codeForm.errors.email}>

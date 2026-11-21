@@ -10,6 +10,7 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
 
     const { data, setData, post, processing, errors } = useForm({
         first_name: prefill.first_name ?? '',
+        middle_name: prefill.middle_name ?? '',
         last_name: prefill.last_name ?? '',
         student_id: prefill.student_id ?? '',
         campus_id: str(prefill.campus_id),
@@ -56,7 +57,7 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
             </div>
 
             <form onSubmit={submit} className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <FormField id="first_name" label="First name" error={errors.first_name}>
                         <input
                             id="first_name"
@@ -64,6 +65,15 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
                             onChange={(e) => setData('first_name', e.target.value)}
                             className="input-field"
                             required
+                        />
+                    </FormField>
+                    <FormField id="middle_name" label="Middle name" error={errors.middle_name} hint="Optional">
+                        <input
+                            id="middle_name"
+                            value={data.middle_name}
+                            onChange={(e) => setData('middle_name', e.target.value)}
+                            className="input-field"
+                            autoComplete="additional-name"
                         />
                     </FormField>
                     <FormField id="last_name" label="Last name" error={errors.last_name}>

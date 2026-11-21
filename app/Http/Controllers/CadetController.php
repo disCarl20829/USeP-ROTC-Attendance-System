@@ -27,8 +27,9 @@ class CadetController extends Controller
                 ...$u->toProfileArray(),
                 'id'        => $u->info_id,
                 'firstName' => $u->first_name,
+                'middleName' => $u->middle_name,
                 'lastName'  => $u->last_name,
-                'name'      => trim("{$u->last_name}, {$u->first_name}"),
+                'name'      => trim("{$u->last_name}, {$u->first_name}" . ($u->middle_initial ? " {$u->middle_initial}." : '')),
                 'idNumber'  => (string) $u->student_id,
                 'course'    => $u->course?->course_name ?? 'N/A',
                 'has_login' => $linkedIds->has($u->user_id),
@@ -54,6 +55,7 @@ class CadetController extends Controller
 
         $data = $request->validate([
             'first_name'        => ['required', 'string', 'max:255'],
+            'middle_name'       => ['nullable', 'string', 'max:255'],
             'last_name'         => ['required', 'string', 'max:255'],
             'email'             => [
                 'required', 'email', 'max:254', 'regex:/^[^@\s]+@usep\.edu\.ph$/i',
@@ -73,6 +75,7 @@ class CadetController extends Controller
             $cadet = UserInfo::create([
                 'user_id'           => (string) Str::uuid(), // replaced by the real login id on sign-up
                 'first_name'        => trim($data['first_name']),
+                'middle_name'       => trim((string) ($data['middle_name'] ?? '')) ?: null,
                 'last_name'         => trim($data['last_name']),
                 'email'             => strtolower(trim($data['email'])),
                 'student_id'        => trim($data['student_id']),
@@ -102,13 +105,15 @@ class CadetController extends Controller
         // Drop / re-enroll buttons send only the status.
         if ($request->keys() === ['status'] || $request->missing('first_name')) {
             $data = $request->validate(['status' => ['required', 'in:active,dropped']]);
-            $cadet->update(['status' => $data['status']]);
+            $cadet->setEnrollment($data['status']);
+            $cadet->save();
 
             return back()->with('success', $data['status'] === 'dropped' ? 'Cadet dropped.' : 'Cadet re-enrolled.');
         }
 
         $data = $request->validate([
             'first_name'        => ['required', 'string', 'max:255'],
+            'middle_name'       => ['nullable', 'string', 'max:255'],
             'last_name'         => ['required', 'string', 'max:255'],
             'student_id'        => LookupOptions::studentIdRules($cadet->info_id),
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
@@ -119,13 +124,14 @@ class CadetController extends Controller
         ]);
 
         $cadet->fill([
-            'first_name' => trim($data['first_name']),
-            'last_name'  => trim($data['last_name']),
-            'student_id' => trim($data['student_id']),
-            'campus_id'  => $data['campus_id'],
-            'course_id'  => $data['course_id'],
-            'status'     => $data['status'],
+            'first_name'  => trim($data['first_name']),
+            'middle_name' => trim((string) ($data['middle_name'] ?? '')) ?: null,
+            'last_name'   => trim($data['last_name']),
+            'student_id'  => trim($data['student_id']),
+            'campus_id'   => $data['campus_id'],
+            'course_id'   => $data['course_id'],
         ]);
+        $cadet->setEnrollment($data['status']);
 
         if (Permissions::allows($actor, 'cadets.assign')) {
             $cadet->platoon_id        = $data['platoon_id'] ?? null;

@@ -14,19 +14,23 @@ Attendance is recorded per formation session with time-in / time-out and a statu
 
 ## How it works
 
-1. **Register** (`/register`): name, USeP email, password.
-2. **Verify email**: type the 6-digit code from the email **or** click the link in it.
+1. **Register** (`/register`): first / middle (optional) / last name, USeP email, password.
+2. **Verify email**: click the link in the email (Supabase's default email). If the email
+   template is later changed to include a 6-digit code, the code can be typed instead.
 3. **Cadet details** (`/setup`): student ID, campus, course (filtered by campus),
    platoon, specialization. The role is always **Cadet**. The profile and a private
    QR token are created and the user lands on the **Dashboard**.
-4. **Officers/admins** create events (formation sessions) and scan cadets on
-   `/qr-scanner` (camera or typed student ID).
+4. **Officers/admins** create events and scan on `/qr-scanner` (camera or typed student
+   ID). A **whole-day** event has a morning and an afternoon session (2 sheet columns);
+   a **half-day** event has one.
 5. **Late** = scanned in after the session's late time.
    **Absent** = marked automatically every 5 minutes for sessions that have ended
    (Supabase `pg_cron` job → `mark_absent_cadets()`).
 6. Scanning someone again for the same session asks the scanner whether to change the
    status (Present / Late / Excused / Absent) or keep it.
-7. **Reports** show the points matrix and export a color-coded Excel sheet.
+7. **Reports** show the points matrix and export a color-coded **.xlsx**: an "All" sheet
+   plus one sheet per platoon, columns NR · SURNAME · FIRSTNAME · MI · 1–15 · TOTAL.
+   Dropped cadets are shown in red, with sessions after the drop left blank.
 
 ### Points
 
@@ -54,6 +58,9 @@ page and API call (`permission:` middleware), and the sidebar hides links you ca
 | Set platoon & specialization | ✅ | ✅ | — | — |
 | Events, Reports + Excel export | ✅ | ✅ | — | — |
 | Change roles, delete profiles, default session times | ✅ | — | — | — |
+
+Attendance is taken for **Cadets and Aspirants** (`config/rotc.php` →
+`attendance_roles`); Officers and Admins are not on the roster.
 
 Cadets choose their platoon and specialization during sign-up; after that only
 officers/admins can change them. Users without a profile are sent to `/setup`;
@@ -107,10 +114,10 @@ Migrations now build the full schema from scratch (including `specialization_lis
 
 ### 4. Supabase Auth settings (one time, in the Supabase dashboard)
 See **[docs/GUIDE.md → Supabase Auth setup](docs/GUIDE.md#supabase-auth-setup)**:
-- **Site URL** = your app URL
-- **Email templates** for *Confirm signup* and *Reset password* (code + link)
-- **Custom SMTP**: Supabase's built-in mailer is heavily rate-limited and not meant
-  for real users
+- **Redirect URLs**: add `<APP_URL>/auth/callback` (needed now, even before the Site URL)
+- **Custom SMTP** (Gmail app password): Supabase's built-in mailer is heavily rate-limited
+- **Site URL** = your app URL (when deploying)
+- Optional later: custom email templates with a 6-digit code
 
 ### 5. Run
 ```bash
@@ -137,8 +144,5 @@ npm run build
 - **[CHANGELOG.md](CHANGELOG.md)**: what changed and when
 
 ## Known limitations
-- The Excel export layout follows the current on-screen grid; it will be matched to
-  the official sample sheet once provided.
-- An event has one session (morning or afternoon by start time); whole-day events
-  with separate morning/afternoon sessions aren't in the UI yet.
-- Only the Cadet role is auto-marked absent (see `mark_absent_cadets()`).
+- The "ODDRM" special-event column from the official sheet is not supported yet.
+- Removing a session from an event is blocked once it has attendance records.

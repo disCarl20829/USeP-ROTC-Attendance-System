@@ -19,6 +19,7 @@ class UserInfo extends Model
     protected $fillable = [
         'user_id',
         'first_name',
+        'middle_name',
         'last_name',
         'email',
         'student_id',
@@ -28,11 +29,15 @@ class UserInfo extends Model
         'platoon_id',
         'specialization_id',
         'status',
+        'dropped_at',
+        'active_since',
     ];
 
     protected $casts = [
-        'date_added' => 'datetime',
-        'updated_at' => 'datetime',
+        'date_added'   => 'datetime',
+        'updated_at'   => 'datetime',
+        'dropped_at'   => 'datetime',
+        'active_since' => 'datetime',
     ];
 
     public function campus()
@@ -72,7 +77,31 @@ class UserInfo extends Model
 
     public function getFullNameAttribute(): string
     {
-        return trim("{$this->first_name} {$this->last_name}");
+        $mi = $this->middle_initial;
+
+        return trim("{$this->first_name} " . ($mi ? "{$mi}. " : '') . $this->last_name);
+    }
+
+    public function getMiddleInitialAttribute(): string
+    {
+        $middle = trim((string) $this->middle_name);
+
+        return $middle === '' ? '' : mb_strtoupper(mb_substr($middle, 0, 1));
+    }
+
+    /** Drop or re-enroll, keeping the dates the sheet and auto-absent rely on. */
+    public function setEnrollment(string $status): void
+    {
+        $status = strtolower($status);
+
+        if ($status === 'dropped' && $this->isActive()) {
+            $this->dropped_at = now();
+        } elseif ($status === 'active' && !$this->isActive()) {
+            $this->dropped_at   = null;
+            $this->active_since = now();
+        }
+
+        $this->status = $status;
     }
 
     public function getRoleName(): string
@@ -118,6 +147,8 @@ class UserInfo extends Model
             'info_id'           => $this->info_id,
             'user_id'           => $this->user_id,
             'first_name'        => $this->first_name,
+            'middle_name'       => $this->middle_name,
+            'middle_initial'    => $this->middle_initial,
             'last_name'         => $this->last_name,
             'name'              => $this->full_name,
             'email'             => $this->email,
@@ -133,6 +164,7 @@ class UserInfo extends Model
             'specialization_id' => $this->specialization_id,
             'specialization'    => $this->specialization?->specialization_name ?? 'Unspecified',
             'status'            => strtolower((string) ($this->status ?? 'active')),
+            'dropped_at'        => $this->dropped_at?->toDateString(),
         ];
     }
 }
