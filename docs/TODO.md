@@ -46,7 +46,6 @@ Legend: `P0` = needed before real use · `P1` = next up · `P2` = important · `
 - [ ] Fix `rotc_usep.sql` (incomplete last line, duplicate `attendance_records`) or
       drop it in favour of the migrations
 - [ ] Remove `database/redacted-migrations/` or document it
-- [ ] Update `DemoSeeder` for the new schema (still uses the old columns)
 - [ ] Old `permission_list` / `role_permissions` migrations create tables that are not
       used (permissions now live in `config/rotc.php`)
 
