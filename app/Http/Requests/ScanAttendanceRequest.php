@@ -8,34 +8,16 @@ class ScanAttendanceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return true; // permission:scan middleware guards the route
     }
 
     public function rules(): array
     {
         return [
-            'student_id_number' => ['required', 'string'],
-            'student_id'        => ['nullable', 'string'],
-            'session_id'        => ['required', 'integer', 'exists:formation_sessions,session_id'],
-            'scan_type'         => ['required_without:type', 'string', 'in:In,Out,in,out'],
-            'type'              => ['required_without:scan_type', 'string', 'in:In,Out,in,out'],
-            'scanned_by'        => ['required', 'string'],
+            // QR token (UUID) from a cadet's QR code, or a typed student ID.
+            'code'       => ['required', 'string', 'max:100'],
+            'session_id' => ['required', 'integer', 'exists:formation_sessions,session_id'],
+            'scan_type'  => ['required', 'string', 'in:in,out,In,Out'],
         ];
-    }
-
-    /**
-     * Normalize inputs before validation runs.
-     */
-    protected function prepareForValidation(): void
-    {
-        if ($this->has('scan_type') || $this->has('type')) {
-            $rawType = $this->input('scan_type', $this->input('type'));
-            $normalizedType = ucfirst(strtolower($rawType)); // 'in' -> 'In', 'out' -> 'Out'
-
-            $this->merge([
-                'scan_type' => $normalizedType,
-                'type'      => strtolower($normalizedType),
-            ]);
-        }
     }
 }

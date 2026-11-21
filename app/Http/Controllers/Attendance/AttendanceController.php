@@ -4,119 +4,66 @@ namespace App\Http\Controllers\Attendance;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
-use App\Models\FormationSession;
-use App\Models\UserInfo;
+use App\Support\Attendance;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class AttendanceController extends Controller
 {
     public function index()
     {
-        // 1. Fetch ALL formation sessions
-        $sessions = FormationSession::with('formation')
+        $tz       = config('rotc.timezone');
+        $sessions = Attendance::sessions()->reverse()->values(); // newest first
+
+        $cadets = Attendance::cadetsQuery()->get()->map(fn ($u) => [
+            'user_id'   => $u->user_id,
+            'name'      => trim("{$u->last_name}, {$u->first_name}"),
+            'id_number' => (string) ($u->student_id ?? ''),
+            'platoon'   => $u->platoon?->platoon_name ?? 'Unspecified',
+        ])->values();
+
+        $records = AttendanceRecord::whereIn('user_id', $cadets->pluck('user_id'))
             ->get()
-            ->map(function ($session) {
-                $sessionId     = $session->session_id ?? $session->id;
-                $sessionType   = ucfirst($session->session_type ?? 'Formation');
-                $formationName = $session->formation?->formation_name 
-                    ?? $session->title 
-                    ?? $session->name 
-                    ?? 'Session #' . $sessionId;
-                
-                $dateRaw = $session->formation?->formation_date ?? $session->created_at ?? null;
-                $formattedDate = $dateRaw ? Carbon::parse($dateRaw)->format('M d, Y') : '';
-
-                return [
-                    'session_id' => (string) $sessionId,
-                    'label'      => "{$sessionType} — {$formationName}" . ($formattedDate ? " ({$formattedDate})" : ''),
-                    'date'       => $formattedDate,
-                ];
-            })
-            ->filter(fn($s) => !empty($s['session_id']))
-            ->values();
-
-        // Helper function to resolve cadet ID across column variations
-        $resolveCadetId = function ($user) {
-            if (!$user) return 'N/A';
-
-            $candidates = [
-                $user->student_id_number ?? null,
-                $user->serial_number ?? null,
-                $user->student_id ?? null,
-                $user->id_number ?? null,
-                ($user->email && str_contains($user->email, '@')) ? explode('@', $user->email)[0] : null,
-            ];
-
-            foreach ($candidates as $candidate) {
-                if (!is_null($candidate) && trim((string) $candidate) !== '') {
-                    return trim((string) $candidate);
-                }
-            }
-
-            return 'N/A';
-        };
-
-        // 2. Fetch all registered cadets
-        $cadets = UserInfo::orderBy('last_name', 'asc')
-            ->orderBy('first_name', 'asc')
-            ->get()
-            ->map(function ($user) use ($resolveCadetId) {
-                $firstName = $user->first_name ?? '';
-                $lastName  = $user->last_name ?? '';
-                $fullName  = trim("{$lastName}, {$firstName}");
-
-                return [
-                    'user_id'   => $user->user_id ?? $user->info_id,
-                    'name'      => $fullName ?: 'Unknown Cadet',
-                    'id_number' => $resolveCadetId($user),
-                ];
-            })
-            ->values();
-
-        // 3. Fetch attendance scan records with linked UserInfo
-        $records = AttendanceRecord::with('user')
-            ->orderBy('date_added', 'desc')
-            ->get()
-            ->map(function ($record) use ($resolveCadetId) {
-                $user      = $record->user;
-                $firstName = $user->first_name ?? '';
-                $lastName  = $user->last_name ?? '';
-                $fullName  = trim("{$firstName} {$lastName}");
-
-                $idNumber = $resolveCadetId($user);
-
-                $timeIn  = $record->time_in ? Carbon::parse($record->time_in)->format('h:i A') : '--:--';
-                $timeOut = $record->time_out ? Carbon::parse($record->time_out)->format('h:i A') : '--:--';
-
-                return [
-                    'record_id'         => $record->record_id ?? $record->id,
-                    'id'                => $record->record_id ?? $record->id,
-                    'user_id'           => $record->user_id,
-                    'session_id'        => (string) $record->session_id,
-                    'student_name'      => $fullName ?: 'Cadet',
-                    'student_id_number' => $idNumber,
-                    'time_in'           => $timeIn,
-                    'time_out'          => $timeOut,
-                    'status'            => strtolower($record->status ?? 'present'),
-                    'user'              => $user ? [
-                        'first_name'        => $firstName,
-                        'last_name'         => $lastName,
-                        'name'              => $fullName,
-                        'student_id_number' => $idNumber,
-                        'serial_number'     => $idNumber,
-                    ] : null,
-                ];
-            })->values();
-
-        if (request()->is('api/*')) {
-            return response()->json($records);
-        }
+            ->map(fn ($r) => [
+                'record_id'  => $r->record_id,
+                'user_id'    => $r->user_id,
+                'session_id' => $r->session_id,
+                'time_in'    => $r->time_in ? Carbon::parse($r->time_in)->setTimezone($tz)->format('h:i A') : '--:--',
+                'time_out'   => $r->time_out ? Carbon::parse($r->time_out)->setTimezone($tz)->format('h:i A') : '--:--',
+                'status'     => strtolower((string) $r->status),
+            ])->values();
 
         return Inertia::render('Attendance', [
             'sessions' => $sessions,
             'cadets'   => $cadets,
             'records'  => $records,
+            'points'   => config('rotc.points'),
         ]);
+    }
+
+    /** Latest scans for the scanner page. */
+    public function recent(Request $request)
+    {
+        $tz = config('rotc.timezone');
+
+        $query = AttendanceRecord::with('user')
+            ->whereNotNull('time_in')
+            ->orderByDesc('time_in')
+            ->limit(15);
+
+        if ($request->filled('session_id')) {
+            $query->where('session_id', (int) $request->input('session_id'));
+        }
+
+        return response()->json($query->get()->map(fn ($r) => [
+            'record_id'  => $r->record_id,
+            'session_id' => $r->session_id,
+            'name'       => $r->user?->full_name ?? 'Cadet',
+            'student_id' => $r->user?->student_id,
+            'status'     => $r->status,
+            'time_in'    => $r->time_in ? Carbon::parse($r->time_in)->setTimezone($tz)->format('h:i A') : null,
+            'time_out'   => $r->time_out ? Carbon::parse($r->time_out)->setTimezone($tz)->format('h:i A') : null,
+        ])->values());
     }
 }

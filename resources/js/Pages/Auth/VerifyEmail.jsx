@@ -1,43 +1,69 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
+import { useState } from 'react';
 import GuestLayout from '@/Layouts/GuestLayout';
-import { EnvelopeIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import FormField from '@/Components/FormField';
+import RegisterSteps from '@/Components/RegisterSteps';
+import StatusMessage from '@/Components/StatusMessage';
 
-export default function VerifyEmail({ status }) {
-    const { post, processing } = useForm({});
+/** Register step 2: enter the emailed code (or click the link in the email). */
+export default function VerifyEmail({ email }) {
+    const { data, setData, post, processing, errors } = useForm({ code: '' });
+    const [resending, setResending] = useState(false);
 
     const submit = (e) => {
         e.preventDefault();
-        post(route('verification.send'));
+        post('/register/verify');
+    };
+
+    const resend = () => {
+        setResending(true);
+        router.post(route('register.resend'), {}, { onFinish: () => setResending(false), preserveScroll: true });
     };
 
     return (
         <GuestLayout>
-            <Head title="Email Verification" />
+            <Head title="Verify your email" />
+            <RegisterSteps current={2} />
+            <StatusMessage />
 
-            <div className="mb-6 flex items-center gap-3 rounded-lg bg-[#7B1E1E]/5 p-4">
-                <EnvelopeIcon className="h-6 w-6 text-[#7B1E1E]" />
-                <p className="text-sm text-gray-600">
-                    Thanks for signing up! Before getting started, could you verify your email address by clicking on the link we just emailed to you?
-                </p>
-            </div>
+            <p className="mb-4 text-sm text-gray-600">
+                We sent a <strong>6-digit code</strong> and a confirmation link to{' '}
+                <strong className="text-gray-900">{email}</strong>. Enter the code below, or click the link in the
+                email.
+            </p>
 
-            {status === 'verification-link-sent' && (
-                <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm font-medium text-green-700">
-                    A new verification link has been sent to the email address you provided during registration.
-                </div>
-            )}
+            <form onSubmit={submit} className="space-y-4">
+                <FormField id="code" label="Verification code" error={errors.code}>
+                    <input
+                        id="code"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={10}
+                        value={data.code}
+                        onChange={(e) => setData('code', e.target.value.replace(/\D/g, ''))}
+                        className="input-field text-center font-mono text-2xl tracking-[0.5em]"
+                        placeholder="••••••"
+                        autoFocus
+                        required
+                    />
+                </FormField>
 
-            <form onSubmit={submit}>
-                <div className="flex items-center justify-between">
-                    <a href={route('logout')} method="post" as="button" className="flex items-center text-sm text-[#7B1E1E] hover:underline">
-                        <ArrowLeftIcon className="mr-1 h-4 w-4" />
-                        Log out
-                    </a>
-                    <button type="submit" disabled={processing} className="btn-primary">
-                        {processing ? 'Sending...' : 'Resend Verification Email'}
-                    </button>
-                </div>
+                <button type="submit" disabled={processing || data.code.length < 6} className="btn-primary w-full">
+                    {processing ? 'Verifying…' : 'Verify email'}
+                </button>
             </form>
+
+            <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4 text-sm">
+                <span className="text-gray-500">Didn&apos;t get it? Check spam.</span>
+                <button
+                    type="button"
+                    onClick={resend}
+                    disabled={resending}
+                    className="font-semibold text-[#7B1E1E] hover:underline disabled:opacity-50"
+                >
+                    {resending ? 'Sending…' : 'Resend code'}
+                </button>
+            </div>
         </GuestLayout>
     );
 }

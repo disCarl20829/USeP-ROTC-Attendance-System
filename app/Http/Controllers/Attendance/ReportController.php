@@ -4,255 +4,204 @@ namespace App\Http\Controllers\Attendance;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
-use App\Models\FormationSession;
-use App\Models\UserInfo;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Support\Attendance;
+use App\Support\Permissions;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
+/**
+ * LE 1: Attendance points matrix.
+ * Points per status come from config/rotc.php (present 10, late 5, excused 8, absent 0).
+ * Absent cells show "A" (0 points); sessions without a record yet are blank.
+ */
 class ReportController extends Controller
 {
     public function index()
     {
-        $sessions = FormationSession::get();
-        $totalSessionsCount = $sessions->count() ?: 19;
-
-        $attendanceRecords = AttendanceRecord::all();
-        $attendanceMap = [];
-
-        foreach ($attendanceRecords as $record) {
-            $status = strtolower($record->status ?? '');
-            $uId = $record->user_id ?? $record->info_id ?? null;
-            $sKey = $record->formation_session_id ?? $record->session_id ?? null;
-
-            if (!$uId || !$sKey) continue;
-            
-            if ($status === 'present') {
-                $val = 10;
-            } elseif ($status === 'late') {
-                $val = $record->points ?? 5;
-            } elseif ($status === 'absent') {
-                $val = 'A';
-            } else {
-                $val = '';
-            }
-
-            $attendanceMap[$uId][$sKey] = $val;
-        }
-
-        $cadets = UserInfo::with(['course', 'platoon'])
-            ->orderBy('last_name', 'asc')
-            ->orderBy('first_name', 'asc')
-            ->get();
-
-        $cadetAttendanceList = $cadets->map(function ($cadet, $index) use ($sessions, $attendanceMap) {
-            $userKey = $cadet->user_id ?? $cadet->info_id;
-            $cadetLogs = $attendanceMap[$userKey] ?? [];
-
-            $sessionMatrix = [];
-            $totalPoints = 0;
-            $latesCount = 0;
-            $absencesCount = 0;
-            $attendedCount = 0;
-
-            foreach ($sessions as $sIndex => $session) {
-                $sId = $session->session_id ?? $session->id ?? ($sIndex + 1);
-                $val = $cadetLogs[$sId] ?? '';
-
-                if ($val === 10) {
-                    $totalPoints += 10;
-                    $attendedCount++;
-                } elseif (is_numeric($val) && $val > 0) {
-                    $totalPoints += (int)$val;
-                    $attendedCount++;
-                    if ($val < 10) {
-                        $latesCount++;
-                    }
-                } elseif ($val === 'A') {
-                    $absencesCount++;
-                }
-
-                $sessionMatrix[$sId] = $val;
-            }
-
-            $firstName = $cadet->first_name ?? '';
-            $lastName  = $cadet->last_name ?? '';
-            $fullName  = trim("{$lastName}, {$firstName}");
-
-            $studentId = $cadet->student_id_number 
-                ?? $cadet->serial_number 
-                ?? ($cadet->email ? explode('@', $cadet->email)[0] : 'N/A');
-
-            return [
-                'nr'                => $index + 1,
-                'id'                => $userKey,
-                'user_id'           => $userKey,
-                'name'              => $fullName ?: 'Unknown Cadet',
-                'student_id'        => $studentId,
-                'program'           => $cadet->course?->course_name ?? 'N/A',
-                'platoon'           => $cadet->platoon?->platoon_name ?? 'N/A',
-                'matrix'            => $sessionMatrix,
-                'attendance_points' => $totalPoints,
-                'lates'             => $latesCount,
-                'absences'          => $absencesCount,
-                'attended'          => $attendedCount,
-                'status'            => strtolower($cadet->status ?? 'active'),
-                'remarks'           => $absencesCount >= 3 ? '3+ ABSENCES (DROPPED RISK)' : 'GOOD STANDING',
-            ];
-        });
-
-        $criticalAbsencesCount  = $cadetAttendanceList->filter(fn($c) => $c['absences'] >= 3)->count();
-        $totalActiveCadetsCount = $cadets->where('status', 'active')->count();
-
-        $averageAttendanceRate = $cadetAttendanceList->count() > 0 
-            ? round(($cadetAttendanceList->sum('attended') / ($cadetAttendanceList->count() * max(1, $totalSessionsCount))) * 100, 1) 
-            : 0;
+        [$sessions, $rows] = $this->build();
+        $ended = $sessions->where('ended', true)->count();
 
         return Inertia::render('Reports', [
             'metrics' => [
-                'averageAttendance'     => $averageAttendanceRate,
-                'totalEvents'           => $totalSessionsCount,
-                'activeCadets'          => $totalActiveCadetsCount,
-                'totalEnrolled'         => $cadets->count(),
-                'criticalAbsencesCount' => $criticalAbsencesCount,
+                'averageAttendance'     => $rows->count() && $ended
+                    ? round($rows->avg(fn ($r) => $r['attended'] / max(1, $r['recorded'])) * 100, 1)
+                    : 0,
+                'totalEvents'           => $sessions->count(),
+                'activeCadets'          => $rows->where('status', 'active')->count(),
+                'totalEnrolled'         => $rows->count(),
+                'criticalAbsencesCount' => $rows->filter(fn ($r) => $r['absences'] >= 3)->count(),
+                'maxPoints'             => Attendance::maxPoints($sessions->count()),
             ],
-            'sessions'            => $sessions,
-            'cadetAttendanceList' => $cadetAttendanceList->values()->toArray(),
+            'points'              => config('rotc.points'),
+            'sessions'            => $sessions->map(fn ($s, $i) => [
+                'id'           => $s['session_id'],
+                'session_id'   => $s['session_id'],
+                'number'       => $i + 1,
+                'session_date' => $s['date'],
+                'title'        => $s['label'],
+            ])->values(),
+            'cadetAttendanceList' => $rows->values(),
         ]);
     }
 
-    /**
-     * Export color-coded Excel spreadsheet natively using HTML table wrapper (.xls format).
-     */
+    /** @return array{0: Collection, 1: Collection} */
+    private function build(): array
+    {
+        $sessions = Attendance::sessions()->values();
+        $cadets   = Attendance::cadetsQuery(includeDropped: true)->get();
+        $records  = AttendanceRecord::whereIn('user_id', $cadets->pluck('user_id'))->get()
+            ->groupBy('user_id')
+            ->map(fn ($rs) => $rs->keyBy('session_id'));
+
+        $rows = $cadets->values()->map(function ($cadet, $i) use ($sessions, $records) {
+            $mine   = $records->get($cadet->user_id, collect());
+            $matrix = [];
+            $tally  = ['present' => 0, 'late' => 0, 'excused' => 0, 'absent' => 0];
+            $total  = 0;
+
+            foreach ($sessions as $s) {
+                $status = strtolower((string) $mine->get($s['session_id'])?->status);
+
+                if (isset($tally[$status])) {
+                    $tally[$status]++;
+                    $total += Permissions::points($status);
+                    $matrix[$s['session_id']] = $status === 'absent' ? 'A' : Permissions::points($status);
+                } else {
+                    $matrix[$s['session_id']] = '';
+                }
+            }
+
+            $recorded = array_sum($tally);
+
+            return [
+                'nr'                => $i + 1,
+                'id'                => $cadet->user_id,
+                'user_id'           => $cadet->user_id,
+                'name'              => trim("{$cadet->last_name}, {$cadet->first_name}"),
+                'student_id'        => (string) $cadet->student_id,
+                'program'           => $cadet->course?->course_name ?? 'N/A',
+                'platoon'           => $cadet->platoon?->platoon_name ?? 'Unspecified',
+                'matrix'            => $matrix,
+                'attendance_points' => $total,
+                'lates'             => $tally['late'],
+                'excused'           => $tally['excused'],
+                'absences'          => $tally['absent'],
+                'attended'          => $tally['present'] + $tally['late'] + $tally['excused'],
+                'recorded'          => $recorded,
+                'status'            => strtolower((string) $cadet->status),
+                'remarks'           => strtolower((string) $cadet->status) === 'dropped'
+                    ? 'DROPPED'
+                    : ($tally['absent'] >= 3 ? '3+ ABSENCES (DROP RISK)' : 'GOOD STANDING'),
+            ];
+        });
+
+        return [$sessions, $rows];
+    }
+
+    /** Color-coded Excel sheet (HTML table saved as .xls; opens in Excel and Google Sheets). */
     public function exportExcel()
     {
-        $sessions = FormationSession::orderBy('session_id', 'asc')->get();
-        if ($sessions->isEmpty()) {
-            $sessions = FormationSession::get();
-        }
+        [$sessions, $rows] = $this->build();
+        $points   = config('rotc.points');
+        $count    = $sessions->count();
+        $max      = Attendance::maxPoints($count);
+        $filename = 'USeP_ROTC_ATTENDANCE_SHEET_' . Carbon::now(config('rotc.timezone'))->format('Y-m-d') . '.xls';
+        $e        = fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 
-        $cadets = UserInfo::orderBy('last_name', 'asc')->orderBy('first_name', 'asc')->get();
-
-        // Fetch attendance records and index by user_id and session identifier
-        $attendanceRecords = AttendanceRecord::all();
-        $attendanceMap = [];
-        
-        foreach ($attendanceRecords as $record) {
-            $status = strtolower($record->status ?? '');
-            $uId = $record->user_id ?? $record->info_id ?? null;
-            $sKey = $record->formation_session_id ?? $record->session_id ?? $record->id ?? null;
-
-            if (!$uId || !$sKey) continue;
-
-            if ($status === 'present') {
-                $val = 10;
-            } elseif ($status === 'late') {
-                $val = $record->points ?? 5;
-            } else {
-                $val = ''; // Leave blank if unrecorded
+        // Spreadsheet column letter for a 1-based index.
+        $col = function (int $n): string {
+            $s = '';
+            while ($n > 0) {
+                $m = ($n - 1) % 26;
+                $s = chr(65 + $m) . $s;
+                $n = intdiv($n - 1, 26);
             }
 
-            $attendanceMap[$uId][$sKey] = $val;
-        }
+            return $s;
+        };
 
-        $filename = 'USeP_ROTC_ATTENDANCE_SHEET_' . date('Y-m-d') . '.xls';
-
-        $headers = [
-            'Content-Type'        => 'application/vnd.ms-excel; charset=utf-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ];
-
-        return response()->stream(function () use ($sessions, $cadets, $attendanceMap) {
+        return response()->stream(function () use ($sessions, $rows, $points, $count, $max, $e, $col) {
             echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
             echo '<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><style>';
-            echo 'table { border-collapse: collapse; font-family: Calibri, sans-serif; font-size: 11pt; }';
-            echo 'th, td { border: 0.5pt solid #000000; text-align: center; vertical-align: middle; padding: 4px; }';
-            echo '.banner { background-color: #84CAEB; font-weight: bold; }';
-            echo '.subhead { background-color: #E7E773; font-weight: bold; }';
-            echo '.tablehead { background-color: #FFFFCC; font-weight: bold; }';
-            echo '.present { background-color: #92D050; font-weight: bold; }';
-            echo '.late { background-color: #FFFF00; font-weight: bold; }';
-            echo '.totalcol { background-color: #FCE4D6; font-weight: bold; }';
-            echo '</style></head><body>';
-            echo '<table>';
+            echo 'table{border-collapse:collapse;font-family:Calibri,sans-serif;font-size:11pt}';
+            echo 'th,td{border:0.5pt solid #000;text-align:center;vertical-align:middle;padding:4px}';
+            echo '.banner{background:#84CAEB;font-weight:bold}.subhead{background:#E7E773;font-weight:bold}';
+            echo '.tablehead{background:#FFFFCC;font-weight:bold}.present{background:#92D050;font-weight:bold}';
+            echo '.late{background:#FFFF00;font-weight:bold}.excused{background:#9BC2E6;font-weight:bold}';
+            echo '.absent{background:#FF7C80;font-weight:bold}.dropped{color:#808080}.totalcol{background:#FCE4D6;font-weight:bold}';
+            echo '</style></head><body><table>';
 
-            // Row 1: Header Banner
-            echo '<tr>';
-            echo '<th colspan="2" class="banner">USeP TAGUM UNIT</th>';
-            echo '<th colspan="19" class="banner">LE 1: ATTENDANCE (30%)</th>';
-            echo '<th rowspan="2" class="subhead">TOTAL</th>';
-            echo '</tr>';
+            $span = max(1, $count);
 
-            // Row 2: Subheader (Session Numbers 1..15, F1..F4)
-            echo '<tr>';
-            echo '<th colspan="2" class="subhead">MALE &amp; FEMALE</th>';
-            $sessionLabels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 'F1', 'F2', 'F3', 'F4'];
-            foreach ($sessionLabels as $lbl) {
-                echo '<th class="subhead">' . $lbl . '</th>';
+            echo '<tr><th colspan="3" class="banner">USeP TAGUM UNIT</th>';
+            echo '<th colspan="' . $span . '" class="banner">LE 1: ATTENDANCE (30%)</th>';
+            echo '<th rowspan="2" class="subhead">TOTAL</th><th rowspan="3" class="subhead">REMARKS</th></tr>';
+
+            echo '<tr><th colspan="3" class="subhead">MALE &amp; FEMALE</th>';
+            if ($count === 0) {
+                echo '<th class="subhead">No sessions yet</th>';
+            }
+            foreach ($sessions as $i => $s) {
+                echo '<th class="subhead">' . ($i + 1) . '</th>';
             }
             echo '</tr>';
 
-            // Row 3: Table Headers & Dates (Cols C-Q dates, Cols R-U point caps 10, Col V Total 190)
-            echo '<tr class="tablehead">';
-            echo '<th>Nr.</th>';
-            echo '<th style="text-align: left; min-width: 220px;">SURNAME, Given Name, MI</th>';
-            
-            // Columns C to Q (Sessions 1 to 15)
-            for ($i = 0; $i < 15; $i++) {
-                $session = $sessions[$i] ?? null;
-                $dateStr = '';
-                if ($session) {
-                    $rawDate = $session->session_date ?? $session->date ?? $session->created_at ?? null;
-                    $dateStr = $rawDate ? date('m/d/y', strtotime($rawDate)) : '';
-                }
-                echo '<th>' . $dateStr . '</th>';
+            echo '<tr class="tablehead"><th>Nr.</th><th style="text-align:left;min-width:220px">SURNAME, Given Name</th><th>Student ID</th>';
+            if ($count === 0) {
+                echo '<th></th>';
             }
-
-            // Columns R to U (F1 to F4 point caps = 10)
-            for ($i = 0; $i < 4; $i++) {
-                echo '<th>10</th>';
+            foreach ($sessions as $s) {
+                echo '<th>' . $e($s['date'] ? Carbon::parse($s['date'])->format('m/d/y') : '') . '<br>' . $e(ucfirst((string) $s['type'])) . '</th>';
             }
+            echo '<th>' . $max . '</th></tr>';
 
-            // Column V (Total Max = 190)
-            echo '<th>190</th>';
-            echo '</tr>';
+            $firstCol = $col(4);
+            $lastCol  = $col(3 + max(1, $count));
 
-            // Cadet Data Rows
-            foreach ($cadets as $idx => $cadet) {
-                $rowNum = $idx + 4;
-                $userKey = $cadet->user_id ?? $cadet->info_id;
-                $fullName = trim("{$cadet->last_name}, {$cadet->first_name}");
+            foreach ($rows as $idx => $r) {
+                $rowNum  = $idx + 4;
+                $dropped = $r['status'] === 'dropped';
 
-                echo '<tr>';
+                echo '<tr' . ($dropped ? ' class="dropped"' : '') . '>';
                 echo '<td>' . ($idx + 1) . '</td>';
-                echo '<td style="text-align: left;">' . htmlspecialchars($fullName) . '</td>';
+                echo '<td style="text-align:left">' . $e($r['name']) . '</td>';
+                echo '<td style="mso-number-format:\'\@\'">' . $e($r['student_id']) . '</td>';
 
-                for ($sIdx = 0; $sIdx < 19; $sIdx++) {
-                    $session = $sessions[$sIdx] ?? null;
-                    if (!$session) {
-                        echo '<td></td>';
-                        continue;
-                    }
-
-                    $sId = $session->session_id ?? $session->id ?? ($sIdx + 1);
-                    $val = $attendanceMap[$userKey][$sId] ?? ($attendanceMap[$userKey][$sIdx + 1] ?? '');
-
-                    $class = '';
-                    if ($val === 10) {
-                        $class = 'present';
-                    } elseif ($val !== '' && is_numeric($val) && $val < 10) {
-                        $class = 'late';
-                    }
-
-                    echo '<td class="' . $class . '">' . $val . '</td>';
+                if ($count === 0) {
+                    echo '<td></td>';
                 }
 
-                // Total column formula matching original Excel (=SUM(C4:U4))
-                echo '<td class="totalcol">=SUM(C' . $rowNum . ':U' . $rowNum . ')</td>';
+                foreach ($sessions as $s) {
+                    $val   = $r['matrix'][$s['session_id']] ?? '';
+                    $class = match (true) {
+                        $val === 'A'               => 'absent',
+                        $val === $points['present'] => 'present',
+                        $val === $points['excused'] => 'excused',
+                        $val === $points['late']    => 'late',
+                        default                     => '',
+                    };
+                    // "A" counts as 0 in the SUM formula (text is ignored).
+                    echo '<td class="' . $class . '">' . $e($val) . '</td>';
+                }
+
+                echo '<td class="totalcol">=SUM(' . $firstCol . $rowNum . ':' . $lastCol . $rowNum . ')</td>';
+                echo '<td>' . $e($r['remarks']) . '</td>';
                 echo '</tr>';
             }
 
+            // Legend
+            $legendSpan = 3 + max(1, $count) + 2;
+            echo '<tr><td colspan="' . $legendSpan . '" style="border:none"></td></tr>';
+            echo '<tr><td colspan="3" class="present">Present = ' . $points['present'] . '</td>'
+                . '<td colspan="2" class="late">Late = ' . $points['late'] . '</td>'
+                . '<td colspan="2" class="excused">Excused = ' . $points['excused'] . '</td>'
+                . '<td colspan="2" class="absent">Absent (A) = ' . $points['absent'] . '</td></tr>';
+
             echo '</table></body></html>';
-        }, 200, $headers);
+        }, 200, [
+            'Content-Type'        => 'application/vnd.ms-excel; charset=utf-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
     }
 }

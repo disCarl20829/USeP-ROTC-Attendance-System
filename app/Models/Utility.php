@@ -10,6 +10,8 @@ class Utility extends Model
 
     public const CREATED_AT = null;
 
+    public $incrementing = false;
+
     protected $fillable = [
         'id',
         'default_start_time',

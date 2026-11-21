@@ -2,202 +2,164 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Campus;
-use App\Models\Course;
-use App\Models\Platoon;
-use App\Models\Role;
+use App\Models\Specialization;
 use App\Models\UserInfo;
+use App\Support\CurrentProfile;
+use App\Support\LookupOptions;
+use App\Support\Permissions;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CadetController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $cadets = UserInfo::with(['course', 'campus', 'platoon', 'role'])
-            ->orderBy('last_name', 'asc')
-            ->orderBy('first_name', 'asc')
+        $linkedIds = DB::table('auth.users')->pluck('id')->flip();
+
+        $cadets = UserInfo::with(['course', 'campus', 'platoon', 'role', 'specialization'])
+            ->orderBy('last_name')
+            ->orderBy('first_name')
             ->get()
-            ->map(function ($user) {
-                $firstName = $user->first_name ?? '';
-                $lastName  = $user->last_name ?? '';
-                $fullName  = trim("{$lastName}, {$firstName}");
-                
-                $idNumber = $user->student_id_number 
-                    ?? $user->serial_number 
-                    ?? ($user->email ? explode('@', $user->email)[0] : 'N/A');
+            ->map(fn (UserInfo $u) => [
+                ...$u->toProfileArray(),
+                'id'        => $u->info_id,
+                'firstName' => $u->first_name,
+                'lastName'  => $u->last_name,
+                'name'      => trim("{$u->last_name}, {$u->first_name}"),
+                'idNumber'  => (string) $u->student_id,
+                'course'    => $u->course?->course_name ?? 'N/A',
+                'has_login' => $linkedIds->has($u->user_id),
+            ]);
 
-                return [
-                    'id'                => $user->user_id ?? $user->info_id,
-                    'user_id'           => $user->user_id ?? $user->info_id,
-                    'info_id'           => $user->info_id,
-                    'firstName'         => $firstName,
-                    'lastName'          => $lastName,
-                    'name'              => $fullName ?: 'Unknown Cadet',
-                    'idNumber'          => $idNumber,
-                    'student_id_number' => $idNumber,
-                    'email'             => $user->email ?? '',
-                    'course'            => $user->course?->course_name ?? 'N/A',
-                    'course_id'         => $user->course_id,
-                    'campus_id'         => $user->campus_id,
-                    'platoon_id'        => $user->platoon_id,
-                    'role_id'           => $user->role_id,
-                    'year'              => $user->year_level ?? '1st Year',
-                    'status'            => strtolower($user->status ?? 'active'),
-                ];
-            });
-
-        $courses  = class_exists(Course::class) ? Course::all() : [];
-        $campuses = class_exists(Campus::class) ? Campus::all() : [];
-        $platoons = class_exists(Platoon::class) ? Platoon::all() : [];
-        $roles    = class_exists(Role::class) ? Role::all() : [];
+        $profile = CurrentProfile::get($request);
 
         return Inertia::render('Cadets', [
-            'cadets'   => $cadets,
-            'courses'  => $courses,
-            'campuses' => $campuses,
-            'platoons' => $platoons,
-            'roles'    => $roles,
+            'cadets' => $cadets,
+            ...LookupOptions::all(),
+            'can'    => [
+                'assign' => Permissions::allows($profile, 'cadets.assign'),
+                'roles'  => Permissions::allows($profile, 'roles.assign'),
+                'delete' => Permissions::allows($profile, 'cadets.delete'),
+            ],
         ]);
     }
 
-    /**
-     * Store a newly created cadet.
-     */
+    /** Hand-add a cadet who has no account yet. Linked on sign-up by email. */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'first_name'        => 'required|string|max:255',
-            'last_name'         => 'required|string|max:255',
-            'email'             => 'nullable|email|max:255',
-            'student_id_number' => 'nullable|string|max:50',
-            'course_id'         => 'nullable',
-            'campus_id'         => 'nullable',
-            'platoon_id'        => 'nullable',
-            'role_id'           => 'nullable',
+        $actor = CurrentProfile::get($request);
+
+        $data = $request->validate([
+            'first_name'        => ['required', 'string', 'max:255'],
+            'last_name'         => ['required', 'string', 'max:255'],
+            'email'             => [
+                'required', 'email', 'max:254', 'regex:/^[^@\s]+@usep\.edu\.ph$/i',
+                fn ($a, $v, $fail) => UserInfo::findByEmail($v) ? $fail('That email already has a profile.') : null,
+            ],
+            'student_id'        => LookupOptions::studentIdRules(),
+            ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
+            'platoon_id'        => ['nullable', 'integer', 'exists:platoon_list,platoon_id'],
+            'specialization_id' => ['nullable', 'integer', 'exists:specialization_list,specialization_id'],
+            'role_id'           => ['nullable', 'integer', 'exists:role_list,role_id'],
         ]);
 
-        $cadet = new UserInfo();
-        $cadet->user_id         = (string) Str::uuid();
-        $cadet->first_name      = trim($validated['first_name']);
-        $cadet->last_name       = trim($validated['last_name']);
-        $cadet->email           = !empty($validated['email']) ? trim($validated['email']) : null;
-        $cadet->course_id       = $validated['course_id'] ?? null;
-        $cadet->campus_id       = $validated['campus_id'] ?? 1;
-        $cadet->platoon_id      = $validated['platoon_id'] ?? null;
-        $cadet->role_id         = $validated['role_id'] ?? 4; // Default to Cadet role ID
-        $cadet->placement       = 1;
-        $cadet->is_system_admin = false;
+        $canAssign = Permissions::allows($actor, 'cadets.assign');
+        $canRoles  = Permissions::allows($actor, 'roles.assign');
 
-        if (Schema::hasColumn('user_info', 'status')) {
-            $cadet->status = 'active';
+        DB::transaction(function () use ($data, $canAssign, $canRoles) {
+            $cadet = UserInfo::create([
+                'user_id'           => (string) Str::uuid(), // replaced by the real login id on sign-up
+                'first_name'        => trim($data['first_name']),
+                'last_name'         => trim($data['last_name']),
+                'email'             => strtolower(trim($data['email'])),
+                'student_id'        => trim($data['student_id']),
+                'campus_id'         => $data['campus_id'],
+                'course_id'         => $data['course_id'],
+                'platoon_id'        => $canAssign ? ($data['platoon_id'] ?? null) : null,
+                'specialization_id' => ($canAssign ? ($data['specialization_id'] ?? null) : null) ?? Specialization::defaultId(),
+                'role_id'           => ($canRoles ? ($data['role_id'] ?? null) : null) ?? LookupOptions::roleId(config('rotc.default_role')),
+                'status'            => 'active',
+            ]);
+
+            $cadet->ensureQrToken();
+        });
+
+        return back()->with('success', 'Cadet added. They can register with the same email to link their account.');
+    }
+
+    public function update(Request $request, int $infoId)
+    {
+        $actor = CurrentProfile::get($request);
+        $cadet = UserInfo::with('role')->findOrFail($infoId);
+
+        if (Permissions::roleOf($cadet) === 'admin' && Permissions::roleOf($actor) !== 'admin') {
+            return back()->with('error', 'Only admins can edit an admin profile.');
         }
 
-        if (!empty($validated['student_id_number'])) {
-            if (Schema::hasColumn('user_info', 'student_id_number')) {
-                $cadet->student_id_number = $validated['student_id_number'];
-            } elseif (Schema::hasColumn('user_info', 'serial_number')) {
-                $cadet->serial_number = $validated['student_id_number'];
+        // Drop / re-enroll buttons send only the status.
+        if ($request->keys() === ['status'] || $request->missing('first_name')) {
+            $data = $request->validate(['status' => ['required', 'in:active,dropped']]);
+            $cadet->update(['status' => $data['status']]);
+
+            return back()->with('success', $data['status'] === 'dropped' ? 'Cadet dropped.' : 'Cadet re-enrolled.');
+        }
+
+        $data = $request->validate([
+            'first_name'        => ['required', 'string', 'max:255'],
+            'last_name'         => ['required', 'string', 'max:255'],
+            'student_id'        => LookupOptions::studentIdRules($cadet->info_id),
+            ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
+            'platoon_id'        => ['nullable', 'integer', 'exists:platoon_list,platoon_id'],
+            'specialization_id' => ['nullable', 'integer', 'exists:specialization_list,specialization_id'],
+            'role_id'           => ['nullable', 'integer', 'exists:role_list,role_id'],
+            'status'            => ['required', 'in:active,dropped'],
+        ]);
+
+        $cadet->fill([
+            'first_name' => trim($data['first_name']),
+            'last_name'  => trim($data['last_name']),
+            'student_id' => trim($data['student_id']),
+            'campus_id'  => $data['campus_id'],
+            'course_id'  => $data['course_id'],
+            'status'     => $data['status'],
+        ]);
+
+        if (Permissions::allows($actor, 'cadets.assign')) {
+            $cadet->platoon_id        = $data['platoon_id'] ?? null;
+            $cadet->specialization_id = $data['specialization_id'] ?? Specialization::defaultId();
+        }
+
+        if (Permissions::allows($actor, 'roles.assign') && !empty($data['role_id']) && (int) $data['role_id'] !== (int) $cadet->role_id) {
+            if ($cadet->info_id === $actor->info_id) {
+                throw ValidationException::withMessages(['role_id' => 'You cannot change your own role.']);
             }
-        }
-
-        if (Schema::hasColumn('user_info', 'date_added')) {
-            $cadet->date_added = now();
+            $cadet->role_id = $data['role_id'];
         }
 
         $cadet->save();
 
-        return redirect()->back()->with('success', 'Cadet created successfully.');
+        return back()->with('success', 'Cadet updated.');
     }
 
-    /**
-     * Update an existing cadet.
-     */
-    public function update(Request $request, $id)
+    public function destroy(Request $request, int $infoId)
     {
-        $query = UserInfo::query();
+        $actor = CurrentProfile::get($request);
 
-        if (Str::isUuid($id)) {
-            $query->where('user_id', $id);
-        } elseif (is_numeric($id)) {
-            $query->where('info_id', (int) $id);
-        } else {
-            $query->where('user_id', $id);
+        if (!Permissions::allows($actor, 'cadets.delete')) {
+            return back()->with('error', 'Only admins can permanently delete a profile. Drop the cadet instead.');
         }
 
-        $cadet = $query->firstOrFail();
+        $cadet = UserInfo::findOrFail($infoId);
 
-        $validated = $request->validate([
-            'first_name'        => 'nullable|string|max:255',
-            'last_name'         => 'nullable|string|max:255',
-            'student_id_number' => 'nullable|string|max:50',
-            'email'             => 'nullable|email|max:255',
-            'course_id'         => 'nullable',
-            'campus_id'         => 'nullable',
-            'platoon_id'        => 'nullable',
-            'role_id'           => 'nullable',
-            'status'            => 'required|string|in:active,dropped',
-        ]);
-
-        if (Schema::hasColumn('user_info', 'status')) {
-            $cadet->status = strtolower($validated['status']);
+        if ($cadet->info_id === $actor->info_id) {
+            return back()->with('error', 'You cannot delete your own profile.');
         }
 
-        if (!empty($validated['first_name'])) {
-            $cadet->first_name = $validated['first_name'];
-        }
-        if (!empty($validated['last_name'])) {
-            $cadet->last_name = $validated['last_name'];
-        }
-        if (array_key_exists('email', $validated)) {
-            $cadet->email = !empty($validated['email']) ? trim($validated['email']) : null;
-        }
-        if (array_key_exists('course_id', $validated)) {
-            $cadet->course_id = $validated['course_id'];
-        }
-        if (array_key_exists('campus_id', $validated)) {
-            $cadet->campus_id = $validated['campus_id'];
-        }
-        if (array_key_exists('platoon_id', $validated)) {
-            $cadet->platoon_id = $validated['platoon_id'];
-        }
-        if (array_key_exists('role_id', $validated)) {
-            $cadet->role_id = $validated['role_id'];
-        }
+        $cadet->delete(); // attendance + QR rows cascade
 
-        if (!empty($validated['student_id_number'])) {
-            if (Schema::hasColumn('user_info', 'student_id_number')) {
-                $cadet->student_id_number = $validated['student_id_number'];
-            } elseif (Schema::hasColumn('user_info', 'serial_number')) {
-                $cadet->serial_number = $validated['student_id_number'];
-            }
-        }
-
-        $cadet->save();
-
-        return redirect()->back()->with('success', 'Cadet updated successfully.');
-    }
-
-    /**
-     * Delete a cadet.
-     */
-    public function destroy($id)
-    {
-        $query = UserInfo::query();
-
-        if (Str::isUuid($id)) {
-            $query->where('user_id', $id);
-        } elseif (is_numeric($id)) {
-            $query->where('info_id', (int) $id);
-        } else {
-            $query->where('user_id', $id);
-        }
-
-        $cadet = $query->firstOrFail();
-        $cadet->delete();
-
-        return redirect()->back()->with('success', 'Cadet deleted successfully.');
+        return back()->with('success', 'Profile deleted.');
     }
 }

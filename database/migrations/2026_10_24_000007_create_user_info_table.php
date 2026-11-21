@@ -31,7 +31,7 @@ return new class extends Migration
         });
 
         DB::statement('ALTER TABLE user_info ADD CONSTRAINT user_info_placement_check CHECK (placement IN (1, 2, 3))');
-        DB::statement('ALTER TABLE user_info ADD CONSTRAINT user_info_email_domain_check CHECK (lower(trim(email)) ~ \'^[^@[:space:]]+@usep[.]edu[.]ph$\'');
+        DB::statement('ALTER TABLE user_info ADD CONSTRAINT user_info_email_domain_check CHECK (lower(trim(email)) ~ \'^[^@[:space:]]+@usep[.]edu[.]ph$\')');
     }
 
     public function down(): void

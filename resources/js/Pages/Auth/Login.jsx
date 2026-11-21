@@ -7,7 +7,6 @@ export default function Login({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
-        remember: false,
     });
 
     const [showPassword, setShowPassword] = useState(false);
@@ -40,7 +39,7 @@ export default function Login({ status, canResetPassword }) {
                             value={data.email}
                             onChange={(e) => setData('email', e.target.value)}
                             className="input-field pl-10"
-                            placeholder="you@example.com"
+                            placeholder="you@usep.edu.ph"
                             autoComplete="username"
                             autoFocus
                         />
@@ -72,19 +71,6 @@ export default function Login({ status, canResetPassword }) {
                     {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
                 </div>
 
-                <div className="mt-4 flex items-center">
-                    <input
-                        id="remember"
-                        type="checkbox"
-                        checked={data.remember}
-                        onChange={(e) => setData('remember', e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-[#7B1E1E] focus:ring-[#7B1E1E]"
-                    />
-                    <label htmlFor="remember" className="ml-2 text-sm text-gray-600">
-                        Remember me
-                    </label>
-                </div>
-
                 <div className="mt-6 flex items-center justify-between">
                     {canResetPassword && (
                         <a
@@ -103,6 +89,13 @@ export default function Login({ status, canResetPassword }) {
                     </button>
                 </div>
             </form>
+
+            <p className="mt-6 border-t border-gray-100 pt-4 text-center text-sm text-gray-600">
+                New cadet?{' '}
+                <a href={route('register')} className="font-semibold text-[#7B1E1E] hover:underline">
+                    Create an account
+                </a>
+            </p>
         </GuestLayout>
     );
 }

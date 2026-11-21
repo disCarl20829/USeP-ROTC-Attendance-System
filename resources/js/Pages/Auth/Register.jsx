@@ -1,10 +1,14 @@
 import { Head, useForm } from '@inertiajs/react';
 import GuestLayout from '@/Layouts/GuestLayout';
-import { UserIcon, EnvelopeIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import FormField from '@/Components/FormField';
+import RegisterSteps from '@/Components/RegisterSteps';
+import StatusMessage from '@/Components/StatusMessage';
 
+/** Register step 1: general info. */
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
+        first_name: '',
+        last_name: '',
         email: '',
         password: '',
         password_confirmation: '',
@@ -20,83 +24,77 @@ export default function Register() {
     return (
         <GuestLayout>
             <Head title="Register" />
+            <RegisterSteps current={1} />
+            <StatusMessage />
 
-            <form onSubmit={submit}>
-                <div>
-                    <label htmlFor="name" className="label-text">Full Name</label>
-                    <div className="relative">
-                        <UserIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <form onSubmit={submit} className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField id="first_name" label="First name" error={errors.first_name}>
                         <input
-                            id="name"
-                            type="text"
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
-                            className="input-field pl-10"
-                            placeholder="Juan Dela Cruz"
-                            autoComplete="name"
+                            id="first_name"
+                            value={data.first_name}
+                            onChange={(e) => setData('first_name', e.target.value)}
+                            className="input-field"
+                            autoComplete="given-name"
                             autoFocus
+                            required
                         />
-                    </div>
-                    {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
-                </div>
-
-                <div className="mt-4">
-                    <label htmlFor="email" className="label-text">Email</label>
-                    <div className="relative">
-                        <EnvelopeIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                    </FormField>
+                    <FormField id="last_name" label="Last name" error={errors.last_name}>
                         <input
-                            id="email"
-                            type="email"
-                            value={data.email}
-                            onChange={(e) => setData('email', e.target.value)}
-                            className="input-field pl-10"
-                            placeholder="you@example.com"
-                            autoComplete="username"
+                            id="last_name"
+                            value={data.last_name}
+                            onChange={(e) => setData('last_name', e.target.value)}
+                            className="input-field"
+                            autoComplete="family-name"
+                            required
                         />
-                    </div>
-                    {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
+                    </FormField>
                 </div>
 
-                <div className="mt-4">
-                    <label htmlFor="password" className="label-text">Password</label>
-                    <div className="relative">
-                        <LockClosedIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                        <input
-                            id="password"
-                            type="password"
-                            value={data.password}
-                            onChange={(e) => setData('password', e.target.value)}
-                            className="input-field pl-10"
-                            placeholder="Create a password"
-                            autoComplete="new-password"
-                        />
-                    </div>
-                    {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
-                </div>
+                <FormField id="email" label="USeP email" error={errors.email} hint="Must end with @usep.edu.ph">
+                    <input
+                        id="email"
+                        type="email"
+                        value={data.email}
+                        onChange={(e) => setData('email', e.target.value)}
+                        className="input-field"
+                        placeholder="you@usep.edu.ph"
+                        autoComplete="username"
+                        required
+                    />
+                </FormField>
 
-                <div className="mt-4">
-                    <label htmlFor="password_confirmation" className="label-text">Confirm Password</label>
-                    <div className="relative">
-                        <LockClosedIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                        <input
-                            id="password_confirmation"
-                            type="password"
-                            value={data.password_confirmation}
-                            onChange={(e) => setData('password_confirmation', e.target.value)}
-                            className="input-field pl-10"
-                            placeholder="Confirm your password"
-                            autoComplete="new-password"
-                        />
-                    </div>
-                    {errors.password_confirmation && <p className="mt-1 text-sm text-red-600">{errors.password_confirmation}</p>}
-                </div>
+                <FormField id="password" label="Password" error={errors.password} hint="At least 12 characters">
+                    <input
+                        id="password"
+                        type="password"
+                        value={data.password}
+                        onChange={(e) => setData('password', e.target.value)}
+                        className="input-field"
+                        autoComplete="new-password"
+                        required
+                    />
+                </FormField>
 
-                <div className="mt-6 flex items-center justify-between">
+                <FormField id="password_confirmation" label="Confirm password" error={errors.password_confirmation}>
+                    <input
+                        id="password_confirmation"
+                        type="password"
+                        value={data.password_confirmation}
+                        onChange={(e) => setData('password_confirmation', e.target.value)}
+                        className="input-field"
+                        autoComplete="new-password"
+                        required
+                    />
+                </FormField>
+
+                <div className="flex items-center justify-between pt-2">
                     <a href={route('login')} className="text-sm text-[#7B1E1E] hover:underline">
                         Already registered?
                     </a>
                     <button type="submit" disabled={processing} className="btn-primary">
-                        {processing ? 'Creating account...' : 'Create account'}
+                        {processing ? 'Sending code…' : 'Continue'}
                     </button>
                 </div>
             </form>

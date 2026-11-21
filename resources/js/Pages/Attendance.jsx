@@ -9,7 +9,7 @@ import {
     MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 
-export default function Attendance({ sessions = [], cadets = [], records = [] }) {
+export default function Attendance({ sessions = [], cadets = [], records = [], points = {} }) {
     const [selectedSessionId, setSelectedSessionId] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -40,7 +40,8 @@ export default function Attendance({ sessions = [], cadets = [], records = [] })
                     (r) => r.user_id === cadet.user_id && String(r.session_id) === String(session.session_id)
                 );
 
-                if (!scan || scan.status === 'absent') {
+                // No record yet counts as absent only once the session has ended.
+                if (scan ? scan.status === 'absent' : session.ended) {
                     totalAbsences += 1;
                 }
             });
@@ -75,7 +76,7 @@ export default function Attendance({ sessions = [], cadets = [], records = [] })
                 date: currentSession ? currentSession.date : 'N/A',
                 timeIn: scan ? scan.time_in : '--:--',
                 timeOut: scan ? scan.time_out : '--:--',
-                status: scan ? scan.status : 'absent',
+                status: scan ? scan.status : currentSession?.ended ? 'absent' : 'pending',
                 totalAbsences: totalAbsences,
                 isAtRisk: totalAbsences >= 3,
             };
@@ -97,6 +98,8 @@ export default function Attendance({ sessions = [], cadets = [], records = [] })
             if (statusFilter === 'present') matchesStatus = item.status === 'present';
             if (statusFilter === 'late') matchesStatus = item.status === 'late';
             if (statusFilter === 'absent') matchesStatus = item.status === 'absent';
+            if (statusFilter === 'excused') matchesStatus = item.status === 'excused';
+            if (statusFilter === 'pending') matchesStatus = item.status === 'pending';
             if (statusFilter === 'at_risk') matchesStatus = item.isAtRisk;
 
             return matchesSearch && matchesStatus;
@@ -109,8 +112,9 @@ export default function Attendance({ sessions = [], cadets = [], records = [] })
         const present = sessionRoster.filter((r) => r.status === 'present').length;
         const late = sessionRoster.filter((r) => r.status === 'late').length;
         const absent = sessionRoster.filter((r) => r.status === 'absent').length;
+        const excused = sessionRoster.filter((r) => r.status === 'excused').length;
 
-        return { total, present, late, absent };
+        return { total, present, late, absent, excused };
     }, [sessionRoster]);
 
     return (
@@ -145,7 +149,9 @@ export default function Attendance({ sessions = [], cadets = [], records = [] })
                         <option value="all">All Statuses</option>
                         <option value="present">Present Only</option>
                         <option value="late">Late Only</option>
+                        <option value="excused">Excused Only</option>
                         <option value="absent">Absent Only</option>
+                        <option value="pending">Not scanned yet</option>
                         <option value="at_risk">⚠️ 3+ Absences (At Risk)</option>
                     </select>
 
@@ -197,8 +203,10 @@ export default function Attendance({ sessions = [], cadets = [], records = [] })
                         <XCircleIcon className="h-6 w-6 text-rose-600" />
                     </div>
                     <div>
-                        <p className="text-2xl font-bold text-gray-900">{stats.absent}</p>
-                        <p className="text-xs font-medium text-gray-500">Absent (This Session)</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                            {stats.absent} <span className="text-sm font-normal text-gray-500">· {stats.excused} excused</span>
+                        </p>
+                        <p className="text-xs font-medium text-gray-500">Absent / Excused (This Session)</p>
                     </div>
                 </div>
 
@@ -282,13 +290,19 @@ export default function Attendance({ sessions = [], cadets = [], records = [] })
                                                         ? 'bg-emerald-100 text-emerald-800'
                                                         : item.status === 'late'
                                                         ? 'bg-amber-100 text-amber-800'
+                                                        : item.status === 'excused'
+                                                        ? 'bg-sky-100 text-sky-800'
+                                                        : item.status === 'pending'
+                                                        ? 'bg-gray-100 text-gray-600'
                                                         : 'bg-rose-100 text-rose-800'
                                                 }`}
                                             >
                                                 {item.status === 'present' && <CheckCircleIcon className="h-3.5 w-3.5" />}
                                                 {item.status === 'absent' && <XCircleIcon className="h-3.5 w-3.5" />}
                                                 {item.status === 'late' && <ClockIcon className="h-3.5 w-3.5" />}
-                                                {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                                                {item.status === 'pending'
+                                                    ? 'Not scanned'
+                                                    : item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                                             </span>
                                         </td>
                                     </tr>

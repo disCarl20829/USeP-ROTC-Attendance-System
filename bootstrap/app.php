@@ -23,8 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'supabase.auth' => \App\Http\Middleware\SupabaseAuth::class,
-            'role'          => \App\Http\Middleware\EnsureUserRole::class,
+            'supabase.auth'    => \App\Http\Middleware\SupabaseAuth::class,
+            'supabase.guest'   => \App\Http\Middleware\RedirectIfSupabaseAuthenticated::class,
+            'profile.complete' => \App\Http\Middleware\EnsureProfileComplete::class,
+            'permission'       => \App\Http\Middleware\EnsurePermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

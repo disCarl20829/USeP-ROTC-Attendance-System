@@ -1,7 +1,7 @@
 # Developer Guide
 
 This guide explains how the system works, how to run it, and — most importantly —
-**how to test the QR attendance flow**.
+the auth flow, Supabase setup, routes and automatic absences.
 
 ---
 
@@ -65,52 +65,51 @@ npm run build
 
 ## 3. Authentication flow
 
-### Login
-1. `POST /login` → `App\Http\Controllers\AuthController@login`
-2. Laravel calls Supabase:
-   `POST /auth/v1/token?grant_type=password`
-3. The token is verified with `GET /auth/v1/user` (server-side).
-4. Only `@usep.edu.ph` emails are accepted.
-5. Laravel stores these **session keys**:
+All auth goes through Supabase Auth's REST API (`app/Services/Supabase.php`). Laravel
+never stores passwords; it keeps the Supabase tokens in the Laravel session.
 
-| Key | Meaning |
-| --- | --- |
-| `supabase_access_token` | Bearer token for Supabase API calls |
-| `supabase_refresh_token` | Refresh token (not used yet) |
-| `supabase_user_id` | Supabase `auth.users.id` (UUID) |
-| `supabase_email` | Verified email |
-| `supabase_token_expires_at` | Unix timestamp of expiry |
+| Step | Route | What happens |
+| --- | --- | --- |
+| Register | `POST /register` | `signup` with first/last name as user metadata → `/register/verify` |
+| Verify (code) | `POST /register/verify` | `verify` (type `email`) → session stored → `/setup` |
+| Verify (link) | `GET /auth/confirm?token_hash=…&type=email` | same, from the email link |
+| Resend | `POST /register/resend` | `resend` (type `signup`) |
+| Setup | `POST /setup` | creates `user_info` (role Cadet) + QR token → `/dashboard` |
+| Login | `POST /login` | password grant; unverified emails are sent to the verify page |
+| Forgot password | `POST /forgot-password` | `recover` → `/reset-password` (code) or link → new password |
+| Logout | `POST /logout` | revokes the Supabase session |
 
-6. Redirect → `/dashboard`.
+**Token renewal:** `SupabaseAuth` middleware refreshes the access token (1 hour) with
+the refresh token when less than 60 s remain. If the refresh fails, the user is logged
+out with "Your session has expired".
 
-### Guard
+**Profile check:** `profile.complete` sends logged-in users without a `user_info` row
+to `/setup`. **Permissions:** `permission:<name>` (see `config/rotc.php`).
 
-`App\Http\Middleware\SupabaseAuth` runs on every protected page and API route.
-It checks the token exists and the expiry is in the future; otherwise it clears the
-session and redirects to `/login`.
+### Supabase Auth setup
 
-> ⚠️ **Critical:** `AuthController` writes `supabase_token_expires_at`.
-> The middleware must read the **same** key. A mismatch here causes the classic
-> "login succeeds but I get bounced back to the login page" bug.
+In the Supabase dashboard for **master-db**:
 
-### Shared user (Inertia)
-
-`HandleInertiaRequests` builds `auth.user` from the session (Laravel's own guard is
-unused, so `$request->user()` is `null`):
-
-```php
-[
-  'id' => '<uuid>',
-  'name' => 'First Last',      // from user_info, or email prefix
-  'email' => 'user@usep.edu.ph',
-  'is_system_admin' => false,
-]
-```
-
-### Token lifetime
-
-Supabase access tokens expire after ~1 hour. **Refresh is not implemented yet**, so
-after about an hour you will be redirected to log in again. See TODO.
+1. **Authentication → URL Configuration → Site URL**: the app URL
+   (e.g. `https://rotc.example.com`, or `http://127.0.0.1:8000` locally).
+2. **Authentication → Emails → Templates**
+   - *Confirm signup*:
+     ```html
+     <h2>Confirm your USeP ROTC account</h2>
+     <p>Your verification code is:</p>
+     <p style="font-size:28px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
+     <p>Or click: <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Confirm my email</a></p>
+     ```
+   - *Reset password*:
+     ```html
+     <h2>Reset your USeP ROTC password</h2>
+     <p>Your reset code is:</p>
+     <p style="font-size:28px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
+     <p>Or click: <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery">Reset my password</a></p>
+     ```
+3. **Authentication → Emails → SMTP Settings**: set up custom SMTP (e.g. a Gmail
+   app password, Resend, Brevo). The built-in mailer sends only a few emails per hour.
+4. **Authentication → Providers → Email**: keep *Confirm email* **on**.
 
 ---
 
@@ -129,11 +128,12 @@ Laravel migrations mirror it.
 | `role_list` | `role_id` | organizational rank, not auth role |
 | `permission_list` | `permission_id` | |
 | `role_permissions` | `(role_id, permission_id)` | composite |
-| `user_info` | `info_id` | `user_id` UUID (FK dropped); also `student_id_number`, `status` |
+| `user_info` | `info_id` | `user_id` UUID (FK dropped); `student_id` (unique), `status` (active/dropped), `specialization_id`, `platoon_id` (optional) |
 | `formations_event` | `formation_id` | |
 | `formation_sessions` | `session_id` | unique `(formation_id, session_type)` |
-| `attendance_qr` | `qr_id` | legacy UUID token; QR now encodes `student_id_number` |
-| `attendance_records` | `record_id` | unique `(user_id, session_id)` |
+| `attendance_qr` | `qr_id` | one private `qr_token` per cadet; this is what the QR encodes |
+| `attendance_records` | `record_id` | unique `(user_id, session_id)`; status present/late/excused/absent |
+| `specialization_list` | `specialization_id` | includes "Unspecified" |
 | `utilities` | `id` (always `1`) | default times |
 | `sessions` | `id` | Laravel session store (added by migration) |
 
@@ -150,187 +150,49 @@ cadets who have no Supabase account yet.
 
 ## 5. Routes reference
 
-Most data now flows through **Inertia web routes** (`routes/web.php`): controllers
-render a page with props, and forms submit with Inertia's `useForm` / `router`.
-Only the QR scanner uses JSON endpoints in `routes/api.php`.
+Run `php artisan route:list --except-vendor` for the full list. Summary:
 
-### Role groups (`routes/web.php`)
+| Route | Permission |
+| --- | --- |
+| `/dashboard`, `/cadet/portal`, `/settings`, `PUT /settings/profile` | any user with a profile |
+| `PUT /settings/system` | `settings.system` (Admin) |
+| `/qr-scanner`, `/api/events`, `/api/attendance/recent`, `POST /api/attendance/scan`, `PATCH /api/attendance/{id}/status` | `scan` |
+| `/attendance` | `attendance.view` |
+| `/cadets` (GET/POST/PUT/DELETE) | `cadets.manage` (+ `cadets.assign`, `roles.assign`, `cadets.delete` for those fields/actions) |
+| `/events` (GET/POST/PUT/DELETE) | `events.manage` |
+| `/reports`, `/reports/export-excel` | `reports.view` |
 
-Every group sits inside `supabase.auth`, and the `role:` middleware
-(`EnsureUserRole`) checks `user_info.role.role_name`. System admins
-(`is_system_admin`) bypass all checks.
-
-| Group | Roles | Routes |
-| --- | --- | --- |
-| Any user | — | `GET /dashboard`, `/profile` |
-| Cadet portal | cadet, aspirant, officer, admin, test | `GET /cadet/portal` |
-| Scanner | aspirant, officer, scanner, admin, test | `GET /attendance`, `GET /qr-scanner` |
-| Management | admin, officer, system admin, test | `/cadets`, `/events`, `/reports`, `/reports/export-excel`, `GET /settings` |
-
-> ⚠️ `EnsureUserRole` currently **fails open** (missing profile, empty role, or any
-> role other than `cadet` is allowed through). See [TODO](TODO.md#p0--broken-or-security-relevant).
-
-### Cadets
-```http
-GET    /cadets
-POST   /cadets
-PUT    /cadets/{info_id}
-DELETE /cadets/{info_id}
-```
-
-Create payload (`CadetController@store`):
-```json
-{
-  "first_name": "Juan",
-  "last_name": "Dela Cruz",
-  "email": "juan@usep.edu.ph",
-  "student_id_number": "2023-00123",
-  "course_id": 1,
-  "campus_id": 1,
-  "platoon_id": 1,
-  "role_id": 4
-}
-```
-
-- A random `user_id` UUID is generated (the cadet does not need a Supabase account yet).
-- `campus_id` defaults to `1`, `role_id` to `4` (Cadet), `status` to `active`.
-- Update also accepts `status: active | dropped` (drop / re-enroll).
-
-### Events
-```http
-GET    /events
-POST   /events
-PUT    /events/{formation_id}
-DELETE /events/{formation_id}
-```
-
-Create payload (`EventController@store`):
-```json
-{
-  "formation_name": "Morning Formation",
-  "formation_date": "2026-11-22",
-  "formation_type": "whole_day",
-  "location": "Grandstand",
-  "start_time": "06:00",
-  "end_time": "08:00"
-}
-```
-
-### Reports
-```http
-GET /reports                 # LE 1 attendance points matrix
-GET /reports/export-excel    # color-coded .xls download
-```
-
-Scoring: **present = 10**, **late = `points` or 5**, **absent = `A`**.
-
-### Settings
-```http
-GET /settings
-PUT /settings   # ⚠️ called by the page, but the route is not registered yet
-```
-
-### Scanner JSON API (`routes/api.php`)
-
-Prefixed with `/api`, protected by `['web', 'supabase.auth']` (session + CSRF). In the
-browser, `axios` sends the session cookie automatically.
+### Scan API
 
 ```http
-GET  /api/events            # events + sessions for the dropdown
-GET  /api/attendance
-POST /api/attendance
 POST /api/attendance/scan
+{ "code": "<QR token or student ID>", "session_id": 1, "scan_type": "in" | "out" }
 ```
 
-Scan payload:
-```json
-{
-  "student_id_number": "2023-00123",
-  "session_id": 1,
-  "scan_type": "In",
-  "scanned_by": "<supabase uuid>"
-}
-```
-
-The endpoint:
-1. Finds the cadet by student ID number (the value encoded in their QR).
-2. Loads the session.
-3. **In:** sets `time_in`; marks `late` if now (Asia/Manila) is past `late_time`,
-   otherwise `present`.
-4. **Out:** sets `time_out` / `time_out_scanned_by`; rejects a second time-out.
+- `200` recorded (`present` or `late` from the session's late time)
+- `409` already recorded → the scanner shows the change-status prompt, which calls
+  `PATCH /api/attendance/{record_id}/status { "status": "present|late|excused|absent" }`
+- `403` dropped cadet · `404` no exact match
 
 ---
 
-## 6. Testing the QR flow
+## 6. Automatic absences
 
-1. Log in as an admin/officer.
-2. **Cadets → Add Cadet** with a student ID number.
-3. **Events → Create** an event for today with a session.
-4. Get the cadet's QR: log in as that cadet and open the **Cadet Portal** /
-   **Dashboard**, or just type the student ID number into the scanner.
-5. Open **QR Scanner**, pick the session and **In**, start the camera and scan
-   (or type the ID and press Enter).
-6. The result card shows **Present** / **Late**; the scan appears under *Recent Scans*
-   and on **Attendance** and **Reports**.
-
-> Camera access needs a secure context: `http://localhost` / `127.0.0.1` works; a phone
-> on the LAN needs HTTPS.
-
-### DemoSeeder
-
-```bash
-php artisan db:seed --class=DemoSeeder
-```
-
-Creates lookup data, a "Demo Cadet" profile for the first `auth.users` row, and a demo
-formation + morning session. ⚠️ It still prints a UUID **QR token** from the old flow;
-scanning now uses the student ID number, so set `user_info.student_id_number` for the demo
-cadet and scan/type that instead.
-
-### Quick API test from the browser console
-
-```js
-await axios.get('/api/events');
-await axios.post('/api/attendance/scan', {
-  student_id_number: '2023-00123',
-  session_id: 1,
-  scan_type: 'In',
-  scanned_by: '<your supabase uuid>',
-});
-```
-
-> Tip: your Supabase UUID is available in the page props (`auth.user.id`).
+`public.mark_absent_cadets()` inserts an `absent` record for every **active Cadet**
+with no record for a session whose end time (Asia/Manila) has passed. Cadets added
+after a session ended are skipped. `pg_cron` runs it every 5 minutes
+(job `mark-absent-cadets`); `php artisan rotc:mark-absent` runs it on demand. A scanner
+can still change an automatic absence to present/late/excused.
 
 ---
 
 ## 7. Frontend
 
-- **Layout:** `resources/js/Layouts/AuthenticatedLayout.jsx` (sidebar hides links by
-  role: cadets see Dashboard only, scanners/aspirants see Attendance + QR Scanner)
-- **Design system:** `resources/css/app.css`
-  - `btn-primary`, `btn-secondary`, `btn-danger`
-  - `card`, `stat-card`
-  - `input-field`, `label-text`
-  - `sidebar-link`, `sidebar-link-active`
-  - `table-header`, `table-cell`
-  - Brand colors: `#7B1E1E` (maroon), `#5C1515` (dark), `#D4A843` (gold)
-- **Pages:** `resources/js/Pages/*.jsx`
-- **Ziggy** provides the global `route()` helper (`@routes` in `app.blade.php`).
-- **QR libraries:** `html5-qrcode` (scanner), `qrcode.react` (installed). Dashboard and
-  Cadet Portal currently use `api.qrserver.com` for the QR image.
-
-### Page wiring status
-
-| Page | Data source | Status |
-| --- | --- | --- |
-| Dashboard | Inertia props (stats, activity, events) | ✅ wired |
-| Cadet Portal | Inertia props (cadet, events) | ✅ wired |
-| Cadets | Inertia props + `/cadets` routes | ✅ wired |
-| Events | Inertia props + `/events` routes | ✅ wired |
-| Attendance | Inertia props (session roster) | ✅ wired |
-| QR Scanner | `/api/events`, `/api/attendance`, `/api/attendance/scan` | ✅ camera + manual |
-| Reports | Inertia props + `/reports/export-excel` | ✅ wired (hardcoded 19 sessions) |
-| Settings | Inertia props + `PUT /settings` | 🟡 loads; save route missing |
+- **Layouts:** `AuthenticatedLayout` (permission-driven sidebar, flash messages),
+  `GuestLayout`
+- **Shared components:** `CadetQrCode` (qrcode.react + PNG download), `MyAttendance`,
+  `StatusBadge`, `FormField` / `SelectField` / `toOptions`, `RegisterSteps`, `StatusMessage`
+- **Design system:** `resources/css/app.css` (`btn-primary`, `card`, `input-field`, …)
 
 ---
 
@@ -374,10 +236,4 @@ php artisan db:seed --class=DemoSeeder
 
 ## 10. What to work on next
 
-See **[TODO.md](TODO.md)**. The short version:
-
-1. Add the missing `PUT /settings` route.
-2. Tighten role enforcement and the scanner's cadet lookup.
-3. Render QR codes locally with `qrcode.react`.
-4. Make Reports / Excel export use the real session count.
-5. Supabase token refresh, `/profile`, and tests.
+See **[TODO.md](TODO.md)**.

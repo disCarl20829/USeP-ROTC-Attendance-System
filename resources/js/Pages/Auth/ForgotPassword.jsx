@@ -1,11 +1,10 @@
 import { Head, useForm } from '@inertiajs/react';
 import GuestLayout from '@/Layouts/GuestLayout';
-import { EnvelopeIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import FormField from '@/Components/FormField';
+import StatusMessage from '@/Components/StatusMessage';
 
 export default function ForgotPassword({ status }) {
-    const { data, setData, post, processing, errors } = useForm({
-        email: '',
-    });
+    const { data, setData, post, processing, errors } = useForm({ email: '' });
 
     const submit = (e) => {
         e.preventDefault();
@@ -14,43 +13,35 @@ export default function ForgotPassword({ status }) {
 
     return (
         <GuestLayout>
-            <Head title="Forgot Password" />
+            <Head title="Forgot password" />
+            <StatusMessage status={status} />
 
-            {status && (
-                <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm font-medium text-green-700">
-                    {status}
-                </div>
-            )}
-
+            <h2 className="mb-1 text-lg font-bold text-gray-900">Forgot your password?</h2>
             <p className="mb-6 text-sm text-gray-600">
-                Forgot your password? No problem. Just let us know your email address and we will email you a password reset link.
+                Enter your USeP email. We&apos;ll send you a 6-digit code and a reset link.
             </p>
 
-            <form onSubmit={submit}>
-                <div>
-                    <label htmlFor="email" className="label-text">Email</label>
-                    <div className="relative">
-                        <EnvelopeIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                        <input
-                            id="email"
-                            type="email"
-                            value={data.email}
-                            onChange={(e) => setData('email', e.target.value)}
-                            className="input-field pl-10"
-                            placeholder="you@example.com"
-                            autoFocus
-                        />
-                    </div>
-                    {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
-                </div>
+            <form onSubmit={submit} className="space-y-4">
+                <FormField id="email" label="USeP email" error={errors.email}>
+                    <input
+                        id="email"
+                        type="email"
+                        value={data.email}
+                        onChange={(e) => setData('email', e.target.value)}
+                        className="input-field"
+                        placeholder="you@usep.edu.ph"
+                        autoComplete="username"
+                        autoFocus
+                        required
+                    />
+                </FormField>
 
-                <div className="mt-6 flex items-center justify-between">
-                    <a href={route('login')} className="flex items-center text-sm text-[#7B1E1E] hover:underline">
-                        <ArrowLeftIcon className="mr-1 h-4 w-4" />
+                <div className="flex items-center justify-between pt-2">
+                    <a href={route('login')} className="text-sm text-[#7B1E1E] hover:underline">
                         Back to login
                     </a>
                     <button type="submit" disabled={processing} className="btn-primary">
-                        {processing ? 'Sending...' : 'Send Reset Link'}
+                        {processing ? 'Sending…' : 'Send reset code'}
                     </button>
                 </div>
             </form>

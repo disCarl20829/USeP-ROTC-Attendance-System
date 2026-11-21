@@ -16,7 +16,7 @@ import {
     XMarkIcon 
 } from '@heroicons/react/24/outline';
 
-export default function Cadets({ cadets = [], courses = [], campuses = [], platoons = [], roles = [] }) {
+export default function Cadets({ cadets = [], courses = [], campuses = [], platoons = [], specializations = [], roles = [], can = {} }) {
     // Modal & Action States
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -29,18 +29,19 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
     // Filters State
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCourse, setSelectedCourse] = useState('All Courses');
-    const [selectedYear, setSelectedYear] = useState('All Years');
+    const [selectedPlatoon, setSelectedPlatoon] = useState('All Platoons');
     const [selectedStatusFilter, setSelectedStatusFilter] = useState('All Statuses');
 
     // Add Cadet Form
     const addForm = useForm({
         first_name: '',
         last_name: '',
-        student_id_number: '',
+        student_id: '',
         email: '',
         course_id: '',
         campus_id: '',
         platoon_id: '',
+        specialization_id: '',
         role_id: '',
         status: 'active',
     });
@@ -49,11 +50,12 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
     const editForm = useForm({
         first_name: '',
         last_name: '',
-        student_id_number: '',
+        student_id: '',
         email: '',
         course_id: '',
         campus_id: '',
         platoon_id: '',
+        specialization_id: '',
         role_id: '',
         status: 'active',
     });
@@ -96,17 +98,18 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
 
     // Modal Handlers - Edit
     const openEditModal = (cadet) => {
-        const id = cadet.id || cadet.user_id;
+        const id = cadet.id;
         setEditingCadetId(id);
         editForm.setData({
             first_name: cadet.firstName || cadet.first_name || '',
             last_name: cadet.lastName || cadet.last_name || '',
-            student_id_number: cadet.idNumber || cadet.student_id_number || '',
+            student_id: cadet.idNumber || cadet.student_id || '',
             email: cadet.email || '',
-            course_id: cadet.course_id || '',
-            campus_id: cadet.campus_id || '',
-            platoon_id: cadet.platoon_id || '',
-            role_id: cadet.role_id || '',
+            course_id: cadet.course_id ? String(cadet.course_id) : '',
+            campus_id: cadet.campus_id ? String(cadet.campus_id) : '',
+            platoon_id: cadet.platoon_id ? String(cadet.platoon_id) : '',
+            specialization_id: cadet.specialization_id ? String(cadet.specialization_id) : '',
+            role_id: cadet.role_id ? String(cadet.role_id) : '',
             status: cadet.status || 'active',
         });
         editForm.clearErrors();
@@ -139,7 +142,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
 
     const handleConfirmDrop = () => {
         if (!selectedCadet) return;
-        const id = selectedCadet.id || selectedCadet.user_id;
+        const id = selectedCadet.id;
 
         router.put(getCadetUpdateUrl(id), {
             status: 'dropped',
@@ -162,7 +165,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
 
     const handleConfirmReEnroll = () => {
         if (!selectedCadet) return;
-        const id = selectedCadet.id || selectedCadet.user_id;
+        const id = selectedCadet.id;
 
         router.put(getCadetUpdateUrl(id), {
             status: 'active',
@@ -176,7 +179,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
     const filteredCadets = useMemo(() => {
         return cadets.filter((cadet) => {
             const nameStr = cadet.name || `${cadet.first_name || ''} ${cadet.last_name || ''}`;
-            const idStr = cadet.idNumber || cadet.student_id_number || '';
+            const idStr = cadet.idNumber || cadet.student_id || '';
 
             const matchesSearch = 
                 nameStr.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -185,17 +188,17 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
             const matchesCourse = 
                 selectedCourse === 'All Courses' || cadet.course === selectedCourse;
 
-            const matchesYear = 
-                selectedYear === 'All Years' || cadet.year === selectedYear;
+            const matchesPlatoon =
+                selectedPlatoon === 'All Platoons' || cadet.platoon === selectedPlatoon;
 
             const matchesStatus = 
                 selectedStatusFilter === 'All Statuses' ||
                 (selectedStatusFilter === 'Active' && cadet.status !== 'dropped') ||
                 (selectedStatusFilter === 'Dropped' && cadet.status === 'dropped');
 
-            return matchesSearch && matchesCourse && matchesYear && matchesStatus;
+            return matchesSearch && matchesCourse && matchesPlatoon && matchesStatus;
         });
-    }, [cadets, searchQuery, selectedCourse, selectedYear, selectedStatusFilter]);
+    }, [cadets, searchQuery, selectedCourse, selectedPlatoon, selectedStatusFilter]);
 
     return (
         <AuthenticatedLayout header="Cadets">
@@ -252,14 +255,16 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
 
                         <select 
                             className="input-field w-auto text-xs"
-                            value={selectedYear}
-                            onChange={(e) => setSelectedYear(e.target.value)}
+                            value={selectedPlatoon}
+                            onChange={(e) => setSelectedPlatoon(e.target.value)}
                         >
-                            <option value="All Years">All Years</option>
-                            <option value="1st Year">1st Year</option>
-                            <option value="2nd Year">2nd Year</option>
-                            <option value="3rd Year">3rd Year</option>
-                            <option value="4th Year">4th Year</option>
+                            <option value="All Platoons">All Platoons</option>
+                            <option value="Unspecified">Unspecified</option>
+                            {platoons.map((p) => (
+                                <option key={p.platoon_id} value={p.platoon_name}>
+                                    {p.platoon_name}
+                                </option>
+                            ))}
                         </select>
                     </div>
                 </div>
@@ -274,7 +279,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                                 <th className="p-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cadet</th>
                                 <th className="p-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ID Number</th>
                                 <th className="p-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course</th>
-                                <th className="p-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Year</th>
+                                <th className="p-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Platoon / Role</th>
                                 <th className="p-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                                 <th className="p-3.5 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                             </tr>
@@ -290,8 +295,8 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                                 filteredCadets.map((cadet) => {
                                     const isDropped = cadet.status === 'dropped';
                                     const cadetName = cadet.name || `${cadet.first_name || ''} ${cadet.last_name || ''}`;
-                                    const idNumber = cadet.idNumber || cadet.student_id_number || 'N/A';
-                                    const cadetId = cadet.id || cadet.user_id;
+                                    const idNumber = cadet.idNumber || cadet.student_id || 'N/A';
+                                    const cadetId = cadet.id;
 
                                     return (
                                         <tr 
@@ -319,7 +324,13 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                                             </td>
                                             <td className="p-3.5 text-xs text-gray-500 font-mono">{idNumber}</td>
                                             <td className="p-3.5 text-xs text-gray-700">{cadet.course || 'N/A'}</td>
-                                            <td className="p-3.5 text-xs text-gray-700">{cadet.year || 'N/A'}</td>
+                                            <td className="p-3.5 text-xs text-gray-700">
+                                                {cadet.platoon}
+                                                <span className="block text-[11px] text-gray-400">
+                                                    {cadet.role} · {cadet.specialization}
+                                                    {!cadet.has_login && ' · no account yet'}
+                                                </span>
+                                            </td>
                                             <td className="p-3.5">
                                                 <span
                                                     className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -412,26 +423,28 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                         </div>
 
                         <div>
-                            <InputLabel htmlFor="add_student_id_number" value="Student ID Number" />
+                            <InputLabel htmlFor="add_student_id" value="Student ID Number" />
                             <TextInput
-                                id="add_student_id_number"
+                                id="add_student_id"
                                 type="text"
                                 className="mt-1 block w-full text-sm"
-                                value={addForm.data.student_id_number}
-                                onChange={(e) => addForm.setData('student_id_number', e.target.value)}
+                                value={addForm.data.student_id}
+                                onChange={(e) => addForm.setData('student_id', e.target.value)}
                                 required
                             />
-                            <InputError message={addForm.errors.student_id_number} className="mt-1" />
+                            <InputError message={addForm.errors.student_id} className="mt-1" />
                         </div>
 
                         <div>
-                            <InputLabel htmlFor="add_email" value="Email Address (Optional)" />
+                            <InputLabel htmlFor="add_email" value="USeP Email (used to link their account)" />
                             <TextInput
                                 id="add_email"
                                 type="email"
                                 className="mt-1 block w-full text-sm"
                                 value={addForm.data.email}
                                 onChange={(e) => addForm.setData('email', e.target.value)}
+                                placeholder="name@usep.edu.ph"
+                                required
                             />
                             <InputError message={addForm.errors.email} className="mt-1" />
                         </div>
@@ -440,14 +453,14 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                             <InputLabel htmlFor="add_course_id" value="Course" />
                             <select
                                 id="add_course_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
                                 value={addForm.data.course_id}
                                 onChange={(e) => addForm.setData('course_id', e.target.value)}
                             >
                                 <option value="">Select Course</option>
-                                {courses.map((c) => (
-                                    <option key={c.course_id || c.id} value={c.course_id || c.id}>
-                                        {c.course_name}
+                                {courses.filter((c) => !addForm.data.campus_id || !c.campus_id || String(c.campus_id) === String(addForm.data.campus_id)).map((x) => (
+                                    <option key={x.course_id} value={x.course_id}>
+                                        {x.course_name}
                                     </option>
                                 ))}
                             </select>
@@ -455,17 +468,17 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                         </div>
 
                         <div>
-                            <InputLabel htmlFor="add_campus_id" value="Unit" />
+                            <InputLabel htmlFor="add_campus_id" value="Campus" />
                             <select
                                 id="add_campus_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
                                 value={addForm.data.campus_id}
                                 onChange={(e) => addForm.setData('campus_id', e.target.value)}
                             >
-                                <option value="">Select Unit</option>
-                                {campuses.map((c) => (
-                                    <option key={c.campus_id || c.id} value={c.campus_id || c.id}>
-                                        {c.campus_name || c.name}
+                                <option value="">Select Campus</option>
+                                {campuses.map((x) => (
+                                    <option key={x.campus_id} value={x.campus_id}>
+                                        {x.campus_name}
                                     </option>
                                 ))}
                             </select>
@@ -476,37 +489,58 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                             <InputLabel htmlFor="add_platoon_id" value="Platoon" />
                             <select
                                 id="add_platoon_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
                                 value={addForm.data.platoon_id}
                                 onChange={(e) => addForm.setData('platoon_id', e.target.value)}
+                                disabled={!can.assign}
                             >
-                                <option value="">Select Platoon</option>
-                                {platoons.map((p) => (
-                                    <option key={p.platoon_id || p.id} value={p.platoon_id || p.id}>
-                                        {p.platoon_name || p.name}
+                                <option value="">Unspecified</option>
+                                {platoons.map((x) => (
+                                    <option key={x.platoon_id} value={x.platoon_id}>
+                                        {x.platoon_name}
                                     </option>
                                 ))}
                             </select>
                             <InputError message={addForm.errors.platoon_id} className="mt-1" />
                         </div>
+                        <div>
+                            <InputLabel htmlFor="add_specialization_id" value="Specialization" />
+                            <select
+                                id="add_specialization_id"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                value={addForm.data.specialization_id}
+                                onChange={(e) => addForm.setData('specialization_id', e.target.value)}
+                                disabled={!can.assign}
+                            >
+                                <option value="">Unspecified</option>
+                                {specializations.map((x) => (
+                                    <option key={x.specialization_id} value={x.specialization_id}>
+                                        {x.specialization_name}
+                                    </option>
+                                ))}
+                            </select>
+                            <InputError message={addForm.errors.specialization_id} className="mt-1" />
+                        </div>
 
+                        {can.roles && (
                         <div>
                             <InputLabel htmlFor="add_role_id" value="Role" />
                             <select
                                 id="add_role_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
                                 value={addForm.data.role_id}
                                 onChange={(e) => addForm.setData('role_id', e.target.value)}
                             >
                                 <option value="">Default (Cadet)</option>
-                                {roles.map((r) => (
-                                    <option key={r.role_id || r.id} value={r.role_id || r.id}>
-                                        {r.role_name || r.name}
+                                {roles.map((x) => (
+                                    <option key={x.role_id} value={x.role_id}>
+                                        {x.role_name}
                                     </option>
                                 ))}
                             </select>
                             <InputError message={addForm.errors.role_id} className="mt-1" />
                         </div>
+                        )}
                     </div>
 
                     <div className="mt-6 flex justify-end gap-3 border-t pt-4">
@@ -554,16 +588,16 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                         </div>
 
                         <div>
-                            <InputLabel htmlFor="edit_student_id_number" value="Student ID Number" />
+                            <InputLabel htmlFor="edit_student_id" value="Student ID Number" />
                             <TextInput
-                                id="edit_student_id_number"
+                                id="edit_student_id"
                                 type="text"
                                 className="mt-1 block w-full text-sm"
-                                value={editForm.data.student_id_number}
-                                onChange={(e) => editForm.setData('student_id_number', e.target.value)}
+                                value={editForm.data.student_id}
+                                onChange={(e) => editForm.setData('student_id', e.target.value)}
                                 required
                             />
-                            <InputError message={editForm.errors.student_id_number} className="mt-1" />
+                            <InputError message={editForm.errors.student_id} className="mt-1" />
                         </div>
 
                         <div>
@@ -573,7 +607,8 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                                 type="email"
                                 className="mt-1 block w-full text-sm"
                                 value={editForm.data.email}
-                                onChange={(e) => editForm.setData('email', e.target.value)}
+                                disabled
+                                onChange={() => {}}
                             />
                             <InputError message={editForm.errors.email} className="mt-1" />
                         </div>
@@ -596,14 +631,14 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                             <InputLabel htmlFor="edit_course_id" value="Course" />
                             <select
                                 id="edit_course_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
                                 value={editForm.data.course_id}
                                 onChange={(e) => editForm.setData('course_id', e.target.value)}
                             >
                                 <option value="">Select Course</option>
-                                {courses.map((c) => (
-                                    <option key={c.course_id || c.id} value={c.course_id || c.id}>
-                                        {c.course_name}
+                                {courses.filter((c) => !editForm.data.campus_id || !c.campus_id || String(c.campus_id) === String(editForm.data.campus_id)).map((x) => (
+                                    <option key={x.course_id} value={x.course_id}>
+                                        {x.course_name}
                                     </option>
                                 ))}
                             </select>
@@ -614,14 +649,14 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                             <InputLabel htmlFor="edit_campus_id" value="Campus" />
                             <select
                                 id="edit_campus_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
                                 value={editForm.data.campus_id}
                                 onChange={(e) => editForm.setData('campus_id', e.target.value)}
                             >
                                 <option value="">Select Campus</option>
-                                {campuses.map((c) => (
-                                    <option key={c.campus_id || c.id} value={c.campus_id || c.id}>
-                                        {c.campus_name || c.name}
+                                {campuses.map((x) => (
+                                    <option key={x.campus_id} value={x.campus_id}>
+                                        {x.campus_name}
                                     </option>
                                 ))}
                             </select>
@@ -632,19 +667,57 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                             <InputLabel htmlFor="edit_platoon_id" value="Platoon" />
                             <select
                                 id="edit_platoon_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
                                 value={editForm.data.platoon_id}
                                 onChange={(e) => editForm.setData('platoon_id', e.target.value)}
+                                disabled={!can.assign}
                             >
-                                <option value="">Select Platoon</option>
-                                {platoons.map((p) => (
-                                    <option key={p.platoon_id || p.id} value={p.platoon_id || p.id}>
-                                        {p.platoon_name || p.name}
+                                <option value="">Unspecified</option>
+                                {platoons.map((x) => (
+                                    <option key={x.platoon_id} value={x.platoon_id}>
+                                        {x.platoon_name}
                                     </option>
                                 ))}
                             </select>
                             <InputError message={editForm.errors.platoon_id} className="mt-1" />
                         </div>
+                        <div>
+                            <InputLabel htmlFor="edit_specialization_id" value="Specialization" />
+                            <select
+                                id="edit_specialization_id"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                value={editForm.data.specialization_id}
+                                onChange={(e) => editForm.setData('specialization_id', e.target.value)}
+                                disabled={!can.assign}
+                            >
+                                <option value="">Unspecified</option>
+                                {specializations.map((x) => (
+                                    <option key={x.specialization_id} value={x.specialization_id}>
+                                        {x.specialization_name}
+                                    </option>
+                                ))}
+                            </select>
+                            <InputError message={editForm.errors.specialization_id} className="mt-1" />
+                        </div>
+                        {can.roles && (
+                        <div>
+                            <InputLabel htmlFor="edit_role_id" value="Role" />
+                            <select
+                                id="edit_role_id"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                value={editForm.data.role_id}
+                                onChange={(e) => editForm.setData('role_id', e.target.value)}
+                            >
+                                <option value="">Keep current role</option>
+                                {roles.map((x) => (
+                                    <option key={x.role_id} value={x.role_id}>
+                                        {x.role_name}
+                                    </option>
+                                ))}
+                            </select>
+                            <InputError message={editForm.errors.role_id} className="mt-1" />
+                        </div>
+                        )}
                     </div>
 
                     <div className="mt-6 flex justify-end gap-3 border-t pt-4">
@@ -664,7 +737,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
 
                         <h3 className="text-lg font-bold text-gray-900">Drop Cadet from ROTC?</h3>
                         <p className="mt-2 text-xs text-gray-600 max-w-sm mx-auto">
-                            Are you sure you want to drop <strong className="text-gray-900">"{selectedCadet.name || `${selectedCadet.first_name} ${selectedCadet.last_name}`}"</strong> ({selectedCadet.idNumber || selectedCadet.student_id_number})?
+                            Are you sure you want to drop <strong className="text-gray-900">"{selectedCadet.name || `${selectedCadet.first_name} ${selectedCadet.last_name}`}"</strong> ({selectedCadet.idNumber || selectedCadet.student_id})?
                         </p>
 
                         <div className="mt-6 flex justify-center gap-3">
@@ -691,7 +764,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
 
                         <h3 className="text-lg font-bold text-gray-900">Re-enroll Cadet?</h3>
                         <p className="mt-2 text-xs text-gray-600 max-w-sm mx-auto">
-                            Re-enroll <strong className="text-gray-900">"{selectedCadet.name || `${selectedCadet.first_name} ${selectedCadet.last_name}`}"</strong> ({selectedCadet.idNumber || selectedCadet.student_id_number}) back into active ROTC status?
+                            Re-enroll <strong className="text-gray-900">"{selectedCadet.name || `${selectedCadet.first_name} ${selectedCadet.last_name}`}"</strong> ({selectedCadet.idNumber || selectedCadet.student_id}) back into active ROTC status?
                         </p>
 
                         <div className="mt-6 flex justify-center gap-3">

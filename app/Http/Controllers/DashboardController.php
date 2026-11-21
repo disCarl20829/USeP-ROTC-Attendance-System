@@ -2,167 +2,129 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\AttendanceRecord;
 use App\Models\FormationEvent;
-use App\Models\FormationSession;
 use App\Models\UserInfo;
+use App\Support\Attendance;
+use App\Support\CurrentProfile;
+use App\Support\Permissions;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $today = now()->toDateString();
+        $profile = CurrentProfile::get($request);
+        $tz      = config('rotc.timezone');
+        $today   = Carbon::now($tz)->toDateString();
 
-        // 1. Fetch Authenticated Supabase User Profile & QR Code Data
-        $userId = $request->session()->get('supabase_user_id');
-        $email  = (string) $request->session()->get('supabase_email', '');
+        $canOverview = Permissions::allows($profile, 'attendance.view') || Permissions::allows($profile, 'reports.view');
 
-        $userProfile = null;
-        if ($userId || $email) {
-            $userProfile = UserInfo::with(['course', 'platoon', 'role'])
-                ->where(function ($query) use ($userId, $email) {
-                    if ($userId) {
-                        $query->where('user_id', $userId);
-                    }
-                    if ($email) {
-                        $query->orWhere('email', $email);
-                    }
-                })
-                ->first();
-        }
+        return Inertia::render('Dashboard', [
+            'profile'        => [...$profile->toProfileArray(), 'qr_token' => $profile->ensureQrToken()],
+            'myAttendance'   => self::attendanceSummary($profile),
+            'overview'       => $canOverview ? $this->overview($today, $tz) : null,
+            'upcomingEvents' => self::upcomingEvents($today),
+            'points'         => config('rotc.points'),
+        ]);
+    }
 
-        // Resolve Cadet ID for QR Code Generation
-        $studentId = $userProfile?->student_id_number 
-            ?? $userProfile?->serial_number 
-            ?? ($email !== '' ? explode('@', $email)[0] : 'CADET-0000');
+    /** Personal attendance: counts, points and history (newest first). */
+    public static function attendanceSummary(UserInfo $profile): array
+    {
+        $tz       = config('rotc.timezone');
+        $sessions = Attendance::sessions()->keyBy('session_id');
+        $records  = AttendanceRecord::where('user_id', $profile->user_id)->get()->keyBy('session_id');
 
-        $firstName = $userProfile?->first_name ?? ($email !== '' ? explode('@', $email)[0] : 'Cadet');
-        $lastName  = $userProfile?->last_name ?? '';
-        $fullName  = trim("{$firstName} {$lastName}") ?: 'Cadet';
+        $counts  = ['present' => 0, 'late' => 0, 'excused' => 0, 'absent' => 0];
+        $history = [];
+        $points  = 0;
+        $counted = 0;
 
-        $cadetData = [
-            'name'        => $fullName,
-            'student_id'  => $studentId,
-            'email'       => $email,
-            'course'      => $userProfile?->course?->course_name ?? 'ROTC Cadet',
-            'platoon'     => $userProfile?->platoon?->platoon_name ?? 'N/A',
-            'qrCodeValue' => $studentId,
-        ];
+        foreach ($sessions->reverse() as $id => $session) {
+            $record = $records->get($id);
+            $status = $record ? strtolower((string) $record->status) : null;
 
-        // 2. Total Active Cadets Count
-        $totalCadets = UserInfo::where(function ($query) {
-            $query->whereNull('status')
-                  ->orWhereRaw("LOWER(status) = 'active'");
-        })->count();
+            if ($status && isset($counts[$status])) {
+                $counts[$status]++;
+                $points += Permissions::points($status);
+                $counted++;
+            }
 
-        // 3. Active / Upcoming Events Count
-        $activeEvents = class_exists(FormationEvent::class) 
-            ? FormationEvent::where(function ($q) use ($today) {
-                if (DB::getSchemaBuilder()->hasColumn('formation_events', 'formation_date')) {
-                    $q->where('formation_date', '>=', $today);
-                } elseif (DB::getSchemaBuilder()->hasColumn('formation_events', 'event_date')) {
-                    $q->where('event_date', '>=', $today);
-                }
-            })->count()
-            : (class_exists(FormationSession::class) ? FormationSession::count() : 0);
-
-        // 4. Today's Attendance Calculations
-        $dateColumn = DB::raw("COALESCE(date_added, time_in)");
-
-        $todayTotalRecords = AttendanceRecord::whereDate($dateColumn, $today)->count();
-
-        $presentTodayCount = AttendanceRecord::whereIn(DB::raw('LOWER(status)'), ['present', 'late'])
-            ->whereDate($dateColumn, $today)
-            ->count();
-
-        $absentToday = AttendanceRecord::where(DB::raw('LOWER(status)'), 'absent')
-            ->whereDate($dateColumn, $today)
-            ->count();
-
-        $attendanceRate = $todayTotalRecords > 0 
-            ? round(($presentTodayCount / $todayTotalRecords) * 100, 1) . '%' 
-            : ($totalCadets > 0 ? round(($presentTodayCount / $totalCadets) * 100, 1) . '%' : '0%');
-
-        // 5. Fetch Recent Activity (Latest Attendance Logged Today)
-        $recentActivityQuery = AttendanceRecord::query();
-
-        if (method_exists(AttendanceRecord::class, 'user')) {
-            $recentActivityQuery->with('user');
-        }
-        if (method_exists(AttendanceRecord::class, 'session')) {
-            $recentActivityQuery->with('session');
-        } elseif (method_exists(AttendanceRecord::class, 'event')) {
-            $recentActivityQuery->with('event');
-        }
-
-        $recentActivity = $recentActivityQuery
-            ->whereDate($dateColumn, $today)
-            ->orderBy($dateColumn, 'desc')
-            ->take(6)
-            ->get()
-            ->map(function ($record) {
-                $cadetName = 'Unknown Cadet';
-                if ($record->user) {
-                    $firstName = $record->user->first_name ?? '';
-                    $lastName  = $record->user->last_name ?? '';
-                    $cadetName = trim("{$firstName} {$lastName}") ?: 'Unknown Cadet';
-                }
-
-                $eventName = $record->session?->session_name 
-                    ?? $record->event?->event_name 
-                    ?? 'Formation Drill';
-
-                $recordTimestamp = $record->date_added ?? $record->time_in;
-
-                return [
-                    'id'     => $record->record_id ?? $record->id,
-                    'cadet'  => $cadetName,
-                    'event'  => $eventName,
-                    'status' => strtolower($record->status ?? 'present'),
-                    'time'   => $recordTimestamp ? Carbon::parse($recordTimestamp)->format('h:i A') : '-',
+            if ($record || $session['ended']) {
+                $history[] = [
+                    'session_id' => $id,
+                    'label'      => $session['label'],
+                    'status'     => $status ?? 'pending',
+                    'points'     => $status ? Permissions::points($status) : null,
+                    'time_in'    => $record?->time_in ? Carbon::parse($record->time_in)->setTimezone($tz)->format('h:i A') : null,
+                    'time_out'   => $record?->time_out ? Carbon::parse($record->time_out)->setTimezone($tz)->format('h:i A') : null,
                 ];
-            });
-
-        // 6. Fetch Upcoming Events
-        $upcomingEvents = [];
-        if (class_exists(FormationEvent::class)) {
-            $dateField = DB::getSchemaBuilder()->hasColumn('formation_events', 'formation_date') 
-                ? 'formation_date' 
-                : (DB::getSchemaBuilder()->hasColumn('formation_events', 'event_date') ? 'event_date' : null);
-
-            if ($dateField) {
-                $upcomingEvents = FormationEvent::where($dateField, '>=', $today)
-                    ->orderBy($dateField, 'asc')
-                    ->take(3)
-                    ->get()
-                    ->map(function ($event) use ($dateField) {
-                        $eventDate = $event->$dateField;
-                        return [
-                            'id'       => $event->id ?? $event->event_id,
-                            'name'     => $event->event_name ?? $event->name ?? 'ROTC Formation',
-                            'date'     => $eventDate ? Carbon::parse($eventDate)->format('M d, Y') : 'TBA',
-                            'time'     => $event->start_time ? Carbon::parse($event->start_time)->format('h:i A') : '07:00 AM',
-                            'location' => $event->location ?? 'Campus Grandstand',
-                        ];
-                    });
             }
         }
 
-        return Inertia::render('Dashboard', [
-            'cadet'     => $cadetData,
-            'statsData' => [
-                'totalCadets'    => $totalCadets,
-                'activeEvents'   => $activeEvents,
-                'attendanceRate' => $attendanceRate,
-                'absentToday'    => $absentToday,
+        $max = Attendance::maxPoints($counted);
+
+        return [
+            'counts'     => $counts,
+            'points'     => $points,
+            'max_points' => $max,
+            'rate'       => $counted > 0 ? round((($counts['present'] + $counts['late'] + $counts['excused']) / $counted) * 100, 1) : null,
+            'history'    => array_slice($history, 0, 10),
+        ];
+    }
+
+    private function overview(string $today, string $tz): array
+    {
+        $todaySessionIds = Attendance::sessions()->where('date', $today)->pluck('session_id');
+        $todayRecords    = AttendanceRecord::whereIn('session_id', $todaySessionIds)->get();
+
+        $recent = AttendanceRecord::with(['user', 'session.formation'])
+            ->whereNotNull('time_in')
+            ->orderByDesc('time_in')
+            ->limit(6)
+            ->get()
+            ->map(fn ($r) => [
+                'id'     => $r->record_id,
+                'cadet'  => $r->user?->full_name ?? 'Cadet',
+                'event'  => ucfirst((string) $r->session?->session_type) . ' — ' . ($r->session?->formation?->formation_name ?? 'Formation'),
+                'status' => strtolower((string) $r->status),
+                'time'   => Carbon::parse($r->time_in)->setTimezone($tz)->format('M d, h:i A'),
+            ]);
+
+        return [
+            'totalCadets'    => Attendance::cadetsQuery()->count(),
+            'upcomingEvents' => FormationEvent::whereDate('formation_date', '>=', $today)->count(),
+            'today'          => [
+                'present' => $todayRecords->where('status', 'present')->count(),
+                'late'    => $todayRecords->where('status', 'late')->count(),
+                'excused' => $todayRecords->where('status', 'excused')->count(),
+                'absent'  => $todayRecords->where('status', 'absent')->count(),
             ],
-            'recentActivity' => $recentActivity->values()->toArray(),
-            'upcomingEvents' => $upcomingEvents,
-        ]);
+            'recentActivity' => $recent->values(),
+        ];
+    }
+
+    public static function upcomingEvents(string $today): array
+    {
+        return FormationEvent::with('sessions')
+            ->whereDate('formation_date', '>=', $today)
+            ->orderBy('formation_date')
+            ->limit(5)
+            ->get()
+            ->map(function (FormationEvent $e) {
+                $first = $e->sessions->sortBy('start_time')->first();
+
+                return [
+                    'id'       => $e->formation_id,
+                    'name'     => $e->formation_name,
+                    'date'     => $e->formation_date?->format('M d, Y'),
+                    'time'     => $first?->start_time ? Carbon::parse($first->start_time)->format('h:i A') : 'TBA',
+                    'sessions' => $e->sessions->count(),
+                ];
+            })
+            ->all();
     }
 }

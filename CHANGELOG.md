@@ -7,10 +7,58 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-21
+
+### Added
+- **3-step registration:** account info → email verification (6-digit code **or**
+  link, with resend) → cadet details (student ID, campus, course filtered by campus,
+  platoon, specialization). Role is always Cadet; profile + QR token are created and
+  the user is logged in to the dashboard.
+- Hand-added cadets are **linked** when they register with the same email; their
+  attendance history moves to the new account.
+- **Forgot password** via email (code or link) → set a new password. Also used for
+  "Change password" from Settings.
+- **Automatic token renewal:** the 1-hour Supabase access token is refreshed with the
+  refresh token before it expires; if renewal fails the user is logged out with a message.
+- **RBAC:** permission map in `config/rotc.php`, `permission:` middleware, deny by
+  default, permission-driven sidebar. `rotc:make-admin` artisan command.
+- **Auto-absent:** `mark_absent_cadets()` + `pg_cron` job every 5 minutes
+  (`rotc:mark-absent` to run it by hand).
+- **Excused** status; points Present 10 / Late 5 / Excused 8 / Absent 0 across
+  Reports, Excel export, Attendance and Dashboard.
+- **Re-scan prompt:** scanning a cadet twice asks whether to change the status.
+- **Dashboard: my attendance** (counts, points, rate, recent sessions) for every user.
+- Events store a location; event forms use the default times from Settings.
+- Named, per-email rate limits (shared campus Wi-Fi no longer locks everyone out).
+
 ### Changed
-- Documentation (`README.md`, `docs/GUIDE.md`, `docs/TODO.md`) updated to reflect
-  the November work: camera scanning, real-data pages, Cadet Portal, Reports,
-  role groups, and current known issues.
+- QR codes are drawn locally with `qrcode.react` and encode a private QR token
+  (no more `api.qrserver.com`). Typed student IDs still work in the scanner.
+- Scanner matches **only** an exact QR token or exact student ID (no partial email match).
+- Dropped cadets cannot be scanned or have their status changed.
+- Reports / Excel export use the real session count and max points (no hardcoded 19 / 190).
+- Settings: own profile (name, student ID, campus, course) saves correctly; platoon /
+  specialization locked for cadets; default times (admin) save correctly.
+- All controllers rewritten against the real `master-db` columns (`student_id`, etc.).
+
+### Fixed
+- Missing `PUT /settings` route; `/profile` crash (Breeze profile removed, Settings
+  replaces it); duplicate `/logout` route.
+- **Timestamps were saved 8 hours off** (Manila times stored as UTC): the DB
+  connection now uses `Asia/Manila`.
+- `create_user_info_table` migration syntax error; empty `add_student_id` migration;
+  `course_list.campus_name` missing from migrations. `php artisan migrate` now works
+  on an empty database.
+
+### Database (master-db)
+- Removed the 1–3 specialization limit; `platoon_id` optional; `status` NOT NULL with
+  check (`active`/`dropped`); unique student ID and email; attendance status check;
+  `ON UPDATE CASCADE` on attendance/QR foreign keys; `formations_event.location`.
+- Deleted the 7 unlinked test profiles (and their 3 records / 2 QR rows).
+
+### Removed
+- Breeze auth/profile controllers, pages and tests; `EnsureUserRole`; unused models
+  and form requests.
 
 ---
 
@@ -165,10 +213,4 @@ Mostly contributed by Jeeyan11 (Oct 30 – Nov 7), merged on Nov 12.
 
 ## Notes for the next release
 
-See **[docs/TODO.md](docs/TODO.md)**. Priorities:
-
-1. Fix Settings save (`PUT /settings` route)
-2. Tighten role/permission enforcement
-3. Make Reports / Excel export use the real session count
-4. Supabase token refresh + `/profile`
-5. Tests and deployment
+See **[docs/TODO.md](docs/TODO.md)**.

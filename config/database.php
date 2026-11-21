@@ -97,6 +97,9 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Must match config('app.timezone'): Laravel writes local times without an
+            // offset, so the DB session has to read them as Manila time, not UTC.
+            'timezone' => env('DB_TIMEZONE', 'Asia/Manila'),
         ],
 
         'sqlsrv' => [

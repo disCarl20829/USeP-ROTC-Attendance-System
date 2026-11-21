@@ -8,10 +8,10 @@ function ShieldIcon({ className = 'h-10 w-10' }) {
     );
 }
 
-export default function GuestLayout({ children }) {
+export default function GuestLayout({ children, wide = false }) {
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-[#5C1515] via-[#7B1E1E] to-[#3D0F0F] px-4 py-8">
-            <div className="w-full max-w-md">
+            <div className={`w-full ${wide ? 'max-w-2xl' : 'max-w-md'}`}>
                 <div className="mb-8 flex flex-col items-center">
                     <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/10 shadow-lg backdrop-blur-sm">
                         <ShieldIcon className="h-10 w-10 text-[#D4A843]" />

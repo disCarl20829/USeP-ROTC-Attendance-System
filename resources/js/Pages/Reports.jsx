@@ -17,7 +17,8 @@ import {
 export default function Reports({
     metrics = { totalEvents: 0, activeCadets: 0, totalEnrolled: 0, criticalAbsencesCount: 0 },
     sessions = [],
-    cadetAttendanceList = []
+    cadetAttendanceList = [],
+    points = { present: 10, late: 5, excused: 8, absent: 0 },
 }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterRiskOnly, setFilterRiskOnly] = useState(false);
@@ -47,10 +48,11 @@ export default function Reports({
     };
 
     const getCellColorClass = (val) => {
-        if (val == 10) return 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 shadow-2xs';
-        if (val == 5) return 'bg-amber-100 text-amber-800 font-bold border border-amber-200 shadow-2xs';
-        if (val == 8) return 'bg-sky-100 text-sky-800 font-bold border border-sky-200 shadow-2xs';
-        if (val === 'A' || val == 0) return 'bg-rose-100 text-rose-800 font-bold border border-rose-200 shadow-2xs';
+        if (val === '' || val === null || val === undefined) return 'bg-gray-50 text-gray-300 border border-gray-200';
+        if (val == points.present) return 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 shadow-2xs';
+        if (val == points.late) return 'bg-amber-100 text-amber-800 font-bold border border-amber-200 shadow-2xs';
+        if (val == points.excused) return 'bg-sky-100 text-sky-800 font-bold border border-sky-200 shadow-2xs';
+        if (val === 'A') return 'bg-rose-100 text-rose-800 font-bold border border-rose-200 shadow-2xs';
         return 'bg-gray-50 text-gray-300 border border-gray-200';
     };
 
@@ -74,12 +76,7 @@ export default function Reports({
         return `S-${index + 1}`;
     };
 
-    const activeSessions = sessions.length > 0 
-        ? sessions 
-        : Array.from({ length: 19 }, (_, i) => ({ 
-            id: i + 1, 
-            session_number: i < 15 ? i + 1 : `F${i - 14}` 
-          }));
+    const activeSessions = sessions;
 
     return (
         <AuthenticatedLayout header="Attendance Reports">
@@ -154,13 +151,16 @@ export default function Reports({
                             {/* Modern Status Legend */}
                             <div className="flex items-center gap-4 text-xs sm:border-l sm:pl-5 border-gray-200">
                                 <span className="flex items-center gap-1.5 font-semibold text-gray-700">
-                                    <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-2xs"></span> 10 (Present)
+                                    <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-2xs"></span> {points.present} (Present)
                                 </span>
                                 <span className="flex items-center gap-1.5 font-semibold text-gray-700">
-                                    <span className="w-3 h-3 rounded-full bg-amber-400 shadow-2xs"></span> 5 (Late)
+                                    <span className="w-3 h-3 rounded-full bg-amber-400 shadow-2xs"></span> {points.late} (Late)
                                 </span>
                                 <span className="flex items-center gap-1.5 font-semibold text-gray-700">
-                                    <span className="w-3 h-3 rounded-full bg-rose-500 shadow-2xs"></span> A (Absent)
+                                    <span className="w-3 h-3 rounded-full bg-sky-500 shadow-2xs"></span> {points.excused} (Excused)
+                                </span>
+                                <span className="flex items-center gap-1.5 font-semibold text-gray-700">
+                                    <span className="w-3 h-3 rounded-full bg-rose-500 shadow-2xs"></span> A (Absent, {points.absent})
                                 </span>
                             </div>
                         </div>
@@ -208,10 +208,10 @@ export default function Reports({
                                     <td colSpan="2" className="py-2 px-3 border-r border-slate-700 text-left font-bold pl-4">MALE &amp; FEMALE</td>
                                     {activeSessions.map((session, idx) => (
                                         <td key={`snum-${session.id || idx}`} className="py-2 px-1 border-r border-slate-700 w-9 font-mono">
-                                            {idx < 15 ? idx + 1 : `F${idx - 14}`}
+                                            {session.number ?? idx + 1}
                                         </td>
                                     ))}
-                                    <td className="py-2 px-2 font-mono">190</td>
+                                    <td className="py-2 px-2 font-mono">{metrics.maxPoints ?? 0}</td>
                                 </tr>
                                 <tr className="bg-gray-100 text-gray-700 border-b-2 border-gray-300 font-bold">
                                     <th className="py-2.5 px-3 border-r border-gray-200 w-12 text-center">Nr.</th>
@@ -246,7 +246,7 @@ export default function Reports({
                                                 </td>
                                                 {activeSessions.map((session, sIdx) => {
                                                     const sId = session.id ?? session.session_id ?? (sIdx + 1);
-                                                    const val = cadet.matrix?.[sId] ?? 'A';
+                                                    const val = cadet.matrix?.[sId] ?? '';
                                                     return (
                                                         <td 
                                                             key={`cell-${cadet.id}-${sId}`} 

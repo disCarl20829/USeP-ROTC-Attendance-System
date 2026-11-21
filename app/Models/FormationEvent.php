@@ -16,6 +16,7 @@ class FormationEvent extends Model
         'formation_name',
         'formation_date',
         'formation_type',
+        'location',
         'created_by',
         'date_added',
     ];
@@ -29,13 +30,4 @@ class FormationEvent extends Model
         return $this->hasMany(FormationSession::class, 'formation_id');
     }
 
-    public function attendanceRecords()
-    {
-        return $this->hasMany(AttendanceRecord::class, 'formation_id');
-    }
-
-    public function creator()
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
 }

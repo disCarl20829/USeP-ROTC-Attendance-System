@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, usePage } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { 
     QrCodeIcon, 
     CameraIcon, 
@@ -13,10 +13,14 @@ import {
 import { Html5Qrcode } from 'html5-qrcode';
 import axios from 'axios';
 
-export default function QRScanner() {
-    const { auth } = usePage().props;
-    const user = auth?.user;
+const STATUS_OPTIONS = [
+    { value: 'present', label: 'Present', className: 'bg-emerald-600 hover:bg-emerald-700' },
+    { value: 'late', label: 'Late', className: 'bg-amber-500 hover:bg-amber-600' },
+    { value: 'excused', label: 'Excused', className: 'bg-sky-600 hover:bg-sky-700' },
+    { value: 'absent', label: 'Absent', className: 'bg-rose-600 hover:bg-rose-700' },
+];
 
+export default function QRScanner({ points = {} }) {
     const [sessions, setSessions] = useState([]);
     const [selectedSessionId, setSelectedSessionId] = useState('');
     const [scanType, setScanType] = useState('In');
@@ -26,12 +30,15 @@ export default function QRScanner() {
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [cameraError, setCameraError] = useState('');
 
-    const [modalConfig, setModalConfig] = useState({ isOpen: false, status: 'success', title: '', message: '' });
+    // status: success | error | duplicate. `record` is set for duplicates.
+    const [modalConfig, setModalConfig] = useState({ isOpen: false, status: 'success', title: '', message: '', record: null });
+    const [changingStatus, setChangingStatus] = useState(false);
 
     const html5QrcodeRef = useRef(null);
-    
+
+    // While a result is on screen, the camera ignores new codes.
     const isProcessingScan = useRef(false);
-    const lastScannedId = useRef(null);
+    const lastScannedCode = useRef(null);
     const lastScanTime = useRef(0);
     const SCAN_COOLDOWN = 3000;
 
@@ -49,123 +56,117 @@ export default function QRScanner() {
         axios
             .get('/api/events')
             .then(({ data }) => {
-                const rawSessions = Array.isArray(data) ? data : data?.data ?? [];
-                const todayStr = new Date().toDateString();
-
-                const todaySessions = rawSessions.filter((session) => {
-                    const sessionDateRaw = session.formation?.formation_date || session.event_date || session.date;
-                    const sessionDateStr = sessionDateRaw ? new Date(sessionDateRaw).toDateString() : todayStr;
-
-                    return sessionDateStr === todayStr && session.status !== 'completed' && session.is_completed !== true;
-                });
-
-                const scannablePool = todaySessions.length > 0 ? todaySessions : rawSessions.filter(s => s.status !== 'completed');
-
-                const formattedSessions = scannablePool.map((session) => {
-                    const sessionTypeName = session.session_type === 'morning' ? 'Morning' : 'Afternoon';
-                    const formationName = session.formation?.formation_name ?? session.title ?? session.name ?? 'Formation';
-                    const resolvedId = session.session_id ?? session.id ?? session.event_id;
-
-                    return {
-                        session_id: resolvedId,
-                        label: `${sessionTypeName} Session — ${formationName}`
-                    };
-                });
-
-                setSessions(formattedSessions);
-
-                if (formattedSessions.length > 0) {
-                    const defaultId = String(formattedSessions[0].session_id);
+                const formatted = (Array.isArray(data) ? data : []).map((s) => ({
+                    session_id: s.session_id,
+                    is_today: s.is_today,
+                    label:
+                        `${s.session_type === 'morning' ? 'Morning' : 'Afternoon'} — ${s.formation_name ?? 'Formation'}` +
+                        (s.is_today ? ' (today)' : s.formation_date ? ` (${s.formation_date})` : ''),
+                }));
+                setSessions(formatted);
+                if (formatted.length > 0) {
+                    const defaultId = String(formatted[0].session_id);
                     setSelectedSessionId(defaultId);
                     selectedSessionIdRef.current = defaultId;
                 }
             })
-            .catch((error) => {
-                console.error("Failed to fetch sessions:", error);
-                setSessions([]);
-            });
+            .catch(() => setSessions([]));
     }, []);
 
     const fetchAttendance = useCallback(async () => {
         try {
-            const { data } = await axios.get('/api/attendance');
-            const records = Array.isArray(data) ? data : data?.data ?? [];
-            setRecentScans(records);
-        } catch (err) {
+            const { data } = await axios.get('/api/attendance/recent', {
+                params: selectedSessionIdRef.current ? { session_id: selectedSessionIdRef.current } : {},
+            });
+            setRecentScans(Array.isArray(data) ? data : []);
+        } catch {
             setRecentScans([]);
         }
     }, []);
 
     useEffect(() => {
         fetchAttendance();
-    }, [fetchAttendance]);
+    }, [fetchAttendance, selectedSessionId]);
 
     const closeModal = () => {
-        setModalConfig((prev) => ({ ...prev, isOpen: false }));
+        setModalConfig((prev) => ({ ...prev, isOpen: false, record: null }));
+        setTimeout(() => {
+            isProcessingScan.current = false;
+        }, 500);
+    };
+
+    const showResult = (status, title, message, record = null) => {
+        isProcessingScan.current = true;
+        setModalConfig({ isOpen: true, status, title, message, record });
     };
 
     const processScanSubmission = async (scannedPayload) => {
         const now = Date.now();
-        const currentScanType = scanTypeRef.current;
-        const currentActiveSessionId = selectedSessionIdRef.current;
+        const code = String(scannedPayload ?? '').trim();
+        const sessionId = selectedSessionIdRef.current;
 
-        if (!scannedPayload || isProcessingScan.current) return;
+        if (!code || isProcessingScan.current) return;
 
-        if (!currentActiveSessionId || String(currentActiveSessionId).trim() === '') {
-            setModalConfig({
-                isOpen: true,
-                status: 'error',
-                title: 'No Session Selected',
-                message: 'Please select an active session scheduled for today before scanning.'
-            });
+        if (!sessionId) {
+            showResult('error', 'No session selected', 'Select a formation session before scanning.');
             return;
         }
 
-        const studentIdMatch = scannedPayload.match(/\d{4}-\d{4,6}/) || scannedPayload.match(/[A-Za-z0-9-]+/);
-        const cleanedStudentId = studentIdMatch ? studentIdMatch[0] : scannedPayload.trim();
+        // The camera reads the same code many times per second.
+        if (code === lastScannedCode.current && now - lastScanTime.current < SCAN_COOLDOWN) return;
 
-        if (cleanedStudentId === lastScannedId.current && (now - lastScanTime.current) < SCAN_COOLDOWN) {
-            return;
-        }
-
-        lastScannedId.current = cleanedStudentId;
+        lastScannedCode.current = code;
         lastScanTime.current = now;
         isProcessingScan.current = true;
-
-        setStudentIdNumber(cleanedStudentId);
         setScanning(true);
 
         try {
             const { data } = await axios.post('/api/attendance/scan', {
-                student_id_number: cleanedStudentId,
-                student_id: cleanedStudentId,
-                session_id: Number(currentActiveSessionId),
-                scan_type: currentScanType,
-                type: currentScanType.toLowerCase(),
-                scanned_by: user?.email ?? user?.name ?? 'System Officer',
+                code,
+                session_id: Number(sessionId),
+                scan_type: scanTypeRef.current.toLowerCase(),
             });
-
-            setModalConfig({
-                isOpen: true,
-                status: 'success',
-                title: `${currentScanType.toUpperCase()} Recorded!`,
-                message: data.message ?? `Attendance successfully logged for Cadet ${cleanedStudentId}`
-            });
-
+            showResult('success', `${scanTypeRef.current.toUpperCase()} recorded`, data.message, data.record);
             setStudentIdNumber('');
-            await fetchAttendance();
+            fetchAttendance();
+        } catch (error) {
+            const res = error?.response;
+            if (res?.status === 409 && res.data?.record) {
+                showResult('duplicate', 'Already recorded', `${res.data.message} Change the status?`, res.data.record);
+            } else if (res?.data?.code === 'dropped') {
+                showResult('error', 'Dropped cadet', res.data.message);
+            } else {
+                showResult('error', 'Scan rejected', res?.data?.message ?? 'Could not record this scan. Try again.');
+            }
+        } finally {
+            setScanning(false);
+        }
+    };
+
+    const changeStatus = async (status) => {
+        const record = modalConfig.record;
+        if (!record) return;
+
+        if (status === record.status) {
+            closeModal();
+            return;
+        }
+
+        setChangingStatus(true);
+        try {
+            const { data } = await axios.patch(`/api/attendance/${record.record_id}/status`, { status });
+            setModalConfig({ isOpen: true, status: 'success', title: 'Status changed', message: data.message, record: null });
+            fetchAttendance();
         } catch (error) {
             setModalConfig({
                 isOpen: true,
                 status: 'error',
-                title: 'Scan Rejected',
-                message: error?.response?.data?.message ?? `Database processing failed for Cadet ID "${cleanedStudentId}".`
+                title: 'Could not change status',
+                message: error?.response?.data?.message ?? 'Try again.',
+                record: null,
             });
         } finally {
-            setScanning(false);
-            setTimeout(() => {
-                isProcessingScan.current = false;
-            }, 1200);
+            setChangingStatus(false);
         }
     };
 
@@ -236,42 +237,6 @@ export default function QRScanner() {
             }
         };
     }, []);
-
-    // Robust fallbacks for Name & ID extraction
-    const getCadetName = (scan) => {
-        const u = scan.user || scan.user_info;
-        if (u) {
-            if (u.name) return u.name;
-            const full = `${u.first_name || ''} ${u.last_name || ''}`.trim();
-            if (full) return full;
-        }
-        if (scan.first_name || scan.last_name) {
-            return `${scan.first_name || ''} ${scan.last_name || ''}`.trim();
-        }
-        return scan.student_name || scan.cadet_name || scan.cadet || 'Cadet';
-    };
-
-    const getCadetId = (scan) => {
-        const u = scan.user || scan.user_info;
-        const candidates = [
-            u?.student_id_number,
-            u?.serial_number,
-            u?.student_id,
-            u?.id_number,
-            u?.idNumber,
-            scan.student_id_number,
-            scan.serial_number,
-            scan.student_id,
-            scan.idNumber,
-            scan.id_number,
-        ];
-
-        const validId = candidates.find(
-            (val) => val !== undefined && val !== null && String(val).trim() !== '' && String(val).trim() !== 'N/A'
-        );
-
-        return validId ? String(validId).trim() : 'N/A';
-    };
 
     const displayedScans = recentScans.filter((scan) => {
         if (!selectedSessionId) return true;
@@ -357,11 +322,11 @@ export default function QRScanner() {
 
                     <div className="mb-4">
                         <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">
-                            Today's Active Session
+                            Formation session
                         </label>
                         {sessions.length === 0 ? (
                             <p className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
-                                No formation sessions scheduled for today.
+                                No formation sessions this week. Create one on the Events page.
                             </p>
                         ) : (
                             <select
@@ -383,13 +348,13 @@ export default function QRScanner() {
 
                     <div className="mb-4">
                         <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">
-                            Cadet ID Number
+                            Or type a student ID
                         </label>
                         <div className="flex gap-2">
                             <input
                                 type="text"
                                 className="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 font-mono text-sm"
-                                placeholder="Auto-filled on scan or enter ID..."
+                                placeholder="e.g. 2023-00123"
                                 value={studentIdNumber}
                                 onChange={(e) => setStudentIdNumber(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && processScanSubmission(studentIdNumber)}
@@ -420,14 +385,16 @@ export default function QRScanner() {
                 <div className="card bg-white shadow rounded-lg overflow-hidden border border-gray-200">
                     <div className="border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 flex justify-between items-center">
                         <div>
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Database Attendance Roster</h3>
-                            <p className="text-xs text-gray-500">Live database records for selected session</p>
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Recent scans</h3>
+                            <p className="text-xs text-gray-500">
+                                Latest scans for the selected session · Present {points.present}, Late {points.late}, Excused {points.excused}, Absent {points.absent} pts
+                            </p>
                         </div>
                     </div>
                     <div className="divide-y divide-gray-100 max-h-[380px] overflow-y-auto">
                         {displayedScans.length === 0 ? (
                             <div className="p-6 text-center text-xs sm:text-sm text-gray-500">
-                                No database records logged for this session yet.
+                                No scans for this session yet.
                             </div>
                         ) : (
                             displayedScans.map((scan) => (
@@ -437,18 +404,18 @@ export default function QRScanner() {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                                            {getCadetName(scan)}
+                                            {scan.name}
                                         </p>
                                         <p className="text-[11px] sm:text-xs text-gray-500 font-mono">
-                                            ID: {getCadetId(scan)}
+                                            ID: {scan.student_id ?? 'N/A'} · <span className="capitalize">{scan.status}</span>
                                         </p>
                                     </div>
                                     <div className="text-right shrink-0">
                                         <p className="text-[11px] sm:text-xs text-emerald-700 font-mono font-medium">
-                                            IN: {scan.time_in ?? scan.entry_date ?? scan.in_time ?? '--:--'}
+                                            IN: {scan.time_in ?? '--:--'}
                                         </p>
                                         <p className="text-[11px] sm:text-xs text-rose-600 font-mono font-medium">
-                                            OUT: {scan.time_out ?? scan.exit_date ?? scan.out_time ?? '--:--'}
+                                            OUT: {scan.time_out ?? '--:--'}
                                         </p>
                                     </div>
                                 </div>
@@ -469,29 +436,56 @@ export default function QRScanner() {
                         </button>
 
                         <div className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${
-                            modalConfig.status === 'success' ? 'bg-emerald-100' : 'bg-rose-100'
+                            modalConfig.status === 'success' ? 'bg-emerald-100' : modalConfig.status === 'duplicate' ? 'bg-amber-100' : 'bg-rose-100'
                         }`}>
                             {modalConfig.status === 'success' ? (
                                 <CheckCircleIcon className="h-8 w-8 text-emerald-600" />
                             ) : (
-                                <ExclamationTriangleIcon className="h-8 w-8 text-rose-600" />
+                                <ExclamationTriangleIcon className={`h-8 w-8 ${modalConfig.status === 'duplicate' ? 'text-amber-600' : 'text-rose-600'}`} />
                             )}
                         </div>
 
                         <h3 className="text-lg font-bold text-gray-900">{modalConfig.title}</h3>
                         <p className="mt-2 text-xs sm:text-sm text-gray-600">{modalConfig.message}</p>
 
-                        <button
-                            type="button"
-                            onClick={closeModal}
-                            className={`mt-6 w-full rounded-xl py-2.5 text-xs font-semibold text-white shadow transition ${
-                                modalConfig.status === 'success'
-                                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                                    : 'bg-rose-600 hover:bg-rose-700'
-                            }`}
-                        >
-                            Continue Scanning
-                        </button>
+                        {modalConfig.status === 'duplicate' && modalConfig.record ? (
+                            <div className="mt-5 space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                    {STATUS_OPTIONS.map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            disabled={changingStatus}
+                                            onClick={() => changeStatus(opt.value)}
+                                            className={`rounded-xl py-2.5 text-xs font-semibold text-white shadow transition disabled:opacity-50 ${opt.className} ${
+                                                modalConfig.record.status === opt.value ? 'ring-2 ring-offset-2 ring-gray-900' : ''
+                                            }`}
+                                        >
+                                            {opt.label} ({points[opt.value] ?? 0})
+                                        </button>
+                                    ))}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={closeModal}
+                                    className="w-full rounded-xl bg-gray-100 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-200"
+                                >
+                                    Keep {String(modalConfig.record.status).toUpperCase()}
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={closeModal}
+                                className={`mt-6 w-full rounded-xl py-2.5 text-xs font-semibold text-white shadow transition ${
+                                    modalConfig.status === 'success'
+                                        ? 'bg-emerald-600 hover:bg-emerald-700'
+                                        : 'bg-rose-600 hover:bg-rose-700'
+                                }`}
+                            >
+                                Continue scanning
+                            </button>
+                        )}
                     </div>
                 </div>
             )}

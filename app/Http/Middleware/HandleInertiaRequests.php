@@ -2,7 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\UserInfo;
+use App\Support\CurrentProfile;
+use App\Support\Permissions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Middleware;
@@ -21,58 +22,35 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $this->supabaseUser($request),
+                'user' => fn () => $this->sharedUser($request),
+            ],
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error'   => fn () => $request->session()->get('error'),
+                'status'  => fn () => $request->session()->get('status'),
             ],
         ];
     }
 
-    private function supabaseUser(Request $request): ?array
+    private function sharedUser(Request $request): ?array
     {
         $userId = $request->session()->get('supabase_user_id');
-        $email  = (string) $request->session()->get('supabase_email', '');
-
-        if (!$userId && !$email) {
+        if (!is_string($userId) || $userId === '') {
             return null;
         }
 
-        // Extract email prefix (e.g., 'gfasenjo00382')
-        $emailPrefix = explode('@', $email)[0] ?? '';
-
-        $profile = UserInfo::with('role')
-            ->where(function ($query) use ($userId, $email, $emailPrefix) {
-                if (!empty($userId)) {
-                    $query->where('user_id', $userId);
-                }
-                if (!empty($email)) {
-                    $query->orWhereRaw('LOWER(email) = ?', [strtolower(trim($email))]);
-                }
-                if (!empty($emailPrefix)) {
-                    $query->orWhere('email', 'LIKE', "%{$emailPrefix}%");
-                }
-            })
-            ->first();
-
-        $name = $profile
-            ? trim($profile->first_name . ' ' . $profile->last_name)
-            : Str::before($email, '@');
-
-        // Default to TRUE for admin access if profile is unlinked or missing
-        $isSysAdmin = $profile ? (bool) ($profile->is_system_admin ?? false) : true;
-        $roleName   = strtolower($profile?->role?->role_name ?? 'admin');
-
-        $isCadet   = ($roleName === 'cadet' && !$isSysAdmin);
-        $isAdmin   = $isSysAdmin || in_array($roleName, ['admin', 'officer', 'system admin', 'test']) || !$profile;
-        $isScanner = $isAdmin || in_array($roleName, ['aspirant', 'scanner']);
+        $email   = (string) $request->session()->get('supabase_email', '');
+        $profile = CurrentProfile::get($request);
+        $role    = Permissions::roleOf($profile);
 
         return [
-            'id'              => $userId ?? $profile?->user_id,
-            'name'            => $name !== '' ? $name : ($email !== '' ? $email : 'Admin User'),
-            'email'           => $email,
-            'role'            => $roleName,
-            'is_system_admin' => $isSysAdmin,
-            'is_admin'        => $isAdmin,
-            'is_scanner'      => $isScanner,
-            'is_cadet'        => $isCadet,
+            'id'          => $userId,
+            'email'       => $email,
+            'name'        => $profile?->full_name ?: Str::before($email, '@'),
+            'role'        => $role ?: null,
+            'has_profile' => (bool) $profile,
+            'status'      => $profile ? strtolower((string) $profile->status) : null,
+            'can'         => Permissions::all($profile),
         ];
     }
 }

@@ -22,7 +22,7 @@ import {
     XMarkIcon
 } from '@heroicons/react/24/outline';
 
-export default function Events({ events = [] }) {
+export default function Events({ events = [], defaults = {} }) {
     // Normalizing events payload (handles both standard array & Laravel paginated object)
     const rawEventsList = Array.isArray(events) ? events : (events?.data || []);
 
@@ -45,9 +45,9 @@ export default function Events({ events = [] }) {
         formation_date: '',
         formation_type: 'half_day',
         location: 'PECC Gym',
-        start_time: '06:30',
-        end_time: '12:00',
-        late_time: '07:00', // Cutoff time for marking cadets Late
+        start_time: defaults.start_time ?? '06:30',
+        end_time: defaults.end_time ?? '12:00',
+        late_time: defaults.late_time ?? '07:00', // after this, scans are marked Late
     });
 
     // 2. Edit Event Form

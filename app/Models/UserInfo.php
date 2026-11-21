@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Permissions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -12,7 +13,6 @@ class UserInfo extends Model
     protected $table = 'user_info';
     protected $primaryKey = 'info_id';
 
-    // Map Eloquent created timestamp to date_added column
     public const CREATED_AT = 'date_added';
     public const UPDATED_AT = 'updated_at';
 
@@ -21,24 +21,18 @@ class UserInfo extends Model
         'first_name',
         'last_name',
         'email',
+        'student_id',
         'campus_id',
         'course_id',
         'role_id',
         'platoon_id',
-        'placement',
-        'is_system_admin',
+        'specialization_id',
         'status',
-        'student_id_number',
-        'serial_number',
-        'date_added',
-        'updated_at',
     ];
 
     protected $casts = [
-        'placement'       => 'integer',
-        'is_system_admin' => 'boolean',
-        'date_added'      => 'datetime',
-        'updated_at'      => 'datetime',
+        'date_added' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function campus()
@@ -61,53 +55,84 @@ class UserInfo extends Model
         return $this->belongsTo(Platoon::class, 'platoon_id', 'platoon_id');
     }
 
+    public function specialization()
+    {
+        return $this->belongsTo(Specialization::class, 'specialization_id', 'specialization_id');
+    }
+
     public function attendanceQr()
     {
         return $this->hasOne(AttendanceQr::class, 'user_id', 'user_id');
     }
 
-    /**
-     * Get the lowercase role name for the user.
-     */
+    public function attendanceRecords()
+    {
+        return $this->hasMany(AttendanceRecord::class, 'user_id', 'user_id');
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return trim("{$this->first_name} {$this->last_name}");
+    }
+
     public function getRoleName(): string
     {
-        return strtolower($this->role?->role_name ?? '');
+        return Permissions::roleOf($this);
     }
 
-    /**
-     * Check if the user has Executive or Admin privileges.
-     */
-    public function isAdmin(): bool
+    public function isActive(): bool
     {
-        if ((bool) $this->is_system_admin) {
-            return true;
-        }
-
-        $role = $this->getRoleName();
-        return in_array($role, ['admin', 'officer', 'system admin', 'test']);
+        return strtolower((string) $this->status) !== 'dropped';
     }
 
-    /**
-     * Check if the user is allowed to scan QR codes (Aspirant, Scanner, Officer, Admin).
-     */
-    public function isScanner(): bool
+    /** Ensure this profile has an active QR token; returns it. */
+    public function ensureQrToken(): string
     {
-        if ($this->isAdmin()) {
-            return true;
+        $qr = $this->attendanceQr()->first();
+
+        if (!$qr) {
+            $qr = AttendanceQr::create([
+                'user_id'   => $this->user_id,
+                'qr_token'  => (string) \Illuminate\Support\Str::uuid(),
+                'is_active' => true,
+            ]);
         }
 
-        return in_array($this->getRoleName(), ['aspirant', 'scanner']);
+        return (string) $qr->qr_token;
     }
 
-    /**
-     * Check if the user is strictly a standard Cadet.
-     */
-    public function isCadet(): bool
+    public static function findByEmail(string $email): ?self
     {
-        if ($this->isAdmin()) {
-            return false;
-        }
+        return static::whereRaw('lower(trim(email)) = ?', [strtolower(trim($email))])->first();
+    }
 
-        return $this->getRoleName() === 'cadet';
+    public static function findByStudentId(string $studentId): ?self
+    {
+        return static::whereRaw('lower(trim(student_id)) = ?', [strtolower(trim($studentId))])->first();
+    }
+
+    /** Summary used by Inertia pages. */
+    public function toProfileArray(): array
+    {
+        return [
+            'info_id'           => $this->info_id,
+            'user_id'           => $this->user_id,
+            'first_name'        => $this->first_name,
+            'last_name'         => $this->last_name,
+            'name'              => $this->full_name,
+            'email'             => $this->email,
+            'student_id'        => $this->student_id,
+            'campus_id'         => $this->campus_id,
+            'campus'            => $this->campus?->campus_name,
+            'course_id'         => $this->course_id,
+            'course'            => $this->course?->course_name,
+            'role_id'           => $this->role_id,
+            'role'              => $this->role?->role_name,
+            'platoon_id'        => $this->platoon_id,
+            'platoon'           => $this->platoon?->platoon_name ?? 'Unspecified',
+            'specialization_id' => $this->specialization_id,
+            'specialization'    => $this->specialization?->specialization_name ?? 'Unspecified',
+            'status'            => strtolower((string) ($this->status ?? 'active')),
+        ];
     }
 }
