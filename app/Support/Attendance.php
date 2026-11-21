@@ -11,12 +11,12 @@ use Illuminate\Support\Collection;
 /** Shared attendance queries (roster, sessions, points). */
 class Attendance
 {
-    /** Active cadets: the people attendance is taken for. */
+    /** Active cadets and aspirants: the people attendance is taken for. */
     public static function cadetsQuery(bool $includeDropped = false): Builder
     {
         return UserInfo::query()
             ->with(['course', 'platoon', 'specialization'])
-            ->whereHas('role', fn ($q) => $q->whereRaw('lower(role_name) = ?', [config('rotc.default_role')]))
+            ->whereHas('role', fn ($q) => $q->whereIn(\DB::raw('lower(role_name)'), config('rotc.attendance_roles')))
             ->when(!$includeDropped, fn ($q) => $q->where('status', 'active'))
             ->orderBy('last_name')
             ->orderBy('first_name');

@@ -74,7 +74,7 @@ return new class extends Migration
             FOREIGN KEY (user_id) REFERENCES public.user_info(user_id) ON DELETE CASCADE ON UPDATE CASCADE;
 
         -- Automatic absences ------------------------------------------------------
-        -- Every active Cadet without a record for a session whose end time has
+        -- Every active Cadet/Aspirant without a record for a session whose end time has
         -- passed (Asia/Manila) gets an 'absent' record. Cadets added after the
         -- session ended are skipped.
         CREATE OR REPLACE FUNCTION public.mark_absent_cadets() RETURNS integer
@@ -89,7 +89,7 @@ return new class extends Migration
             JOIN role_list r ON r.role_id = u.role_id
             WHERE ((f.formation_date + s.end_time) AT TIME ZONE 'Asia/Manila') <= now()
               AND u.status = 'active'
-              AND lower(r.role_name) = 'cadet'
+              AND lower(r.role_name) IN ('cadet', 'aspirant')
               AND u.date_added <= ((f.formation_date + s.end_time) AT TIME ZONE 'Asia/Manila')
             ON CONFLICT (user_id, session_id) DO NOTHING;
             GET DIAGNOSTICS inserted = ROW_COUNT;
