@@ -1,7 +1,7 @@
 # Developer Guide
 
 This guide explains how the system works, how to run it, and — most importantly —
-**how to test the QR attendance flow today**.
+**how to test the QR attendance flow**.
 
 ---
 
@@ -23,7 +23,8 @@ routes/api.php  ──►  Controllers  ─────────────�
 - **Inertia** lets React pages act like server-rendered pages: Laravel sends a page
   component name + props, and React renders it. There is no separate REST client for
   page navigation.
-- **API routes** are used for dynamic actions (fetching lists, scanning QR codes).
+- **API routes** (`routes/api.php`) are only used by the QR scanner; everything else
+  (cadets, events, reports, settings) goes through Inertia web routes.
 - **Supabase** owns users/passwords (`auth.users`); Postgres stores ROTC data.
 - Laravel does **not** use its own `Auth::login()` — the Supabase session is stored
   in the Laravel session instead.
@@ -128,10 +129,10 @@ Laravel migrations mirror it.
 | `role_list` | `role_id` | organizational rank, not auth role |
 | `permission_list` | `permission_id` | |
 | `role_permissions` | `(role_id, permission_id)` | composite |
-| `user_info` | `info_id` | `user_id` UUID → `auth.users.id` |
+| `user_info` | `info_id` | `user_id` UUID (FK dropped); also `student_id_number`, `status` |
 | `formations_event` | `formation_id` | |
 | `formation_sessions` | `session_id` | unique `(formation_id, session_type)` |
-| `attendance_qr` | `qr_id` | one row per cadet, `qr_token` UUID |
+| `attendance_qr` | `qr_id` | legacy UUID token; QR now encodes `student_id_number` |
 | `attendance_records` | `record_id` | unique `(user_id, session_id)` |
 | `utilities` | `id` (always `1`) | default times |
 | `sessions` | `id` | Laravel session store (added by migration) |
@@ -142,73 +143,100 @@ Laravel migrations mirror it.
 
 ### Foreign keys
 All user references point to `auth.users(id)` (UUID), **not** the stock Laravel
-`users` table.
+`users` table — except `user_info.user_id`, whose FK was dropped so admins can add
+cadets who have no Supabase account yet.
 
 ---
 
-## 5. API reference
+## 5. Routes reference
 
-All routes are in `routes/api.php`, prefixed with `/api`, and protected by
-`['web', 'supabase.auth']` (session + CSRF).
+Most data now flows through **Inertia web routes** (`routes/web.php`): controllers
+render a page with props, and forms submit with Inertia's `useForm` / `router`.
+Only the QR scanner uses JSON endpoints in `routes/api.php`.
 
-> Because they use the `web` group, requests must include the session cookie.
-> In the browser, `axios` does this automatically.
+### Role groups (`routes/web.php`)
+
+Every group sits inside `supabase.auth`, and the `role:` middleware
+(`EnsureUserRole`) checks `user_info.role.role_name`. System admins
+(`is_system_admin`) bypass all checks.
+
+| Group | Roles | Routes |
+| --- | --- | --- |
+| Any user | — | `GET /dashboard`, `/profile` |
+| Cadet portal | cadet, aspirant, officer, admin, test | `GET /cadet/portal` |
+| Scanner | aspirant, officer, scanner, admin, test | `GET /attendance`, `GET /qr-scanner` |
+| Management | admin, officer, system admin, test | `/cadets`, `/events`, `/reports`, `/reports/export-excel`, `GET /settings` |
+
+> ⚠️ `EnsureUserRole` currently **fails open** (missing profile, empty role, or any
+> role other than `cadet` is allowed through). See [TODO](TODO.md#p0--broken-or-security-relevant).
 
 ### Cadets
 ```http
-GET    /api/cadets
-POST   /api/cadets
-PUT    /api/cadets/{info_id}
-DELETE /api/cadets/{info_id}
+GET    /cadets
+POST   /cadets
+PUT    /cadets/{info_id}
+DELETE /cadets/{info_id}
 ```
 
-Create payload:
+Create payload (`CadetController@store`):
 ```json
 {
-  "user_id": "<supabase uuid>",
   "first_name": "Juan",
   "last_name": "Dela Cruz",
   "email": "juan@usep.edu.ph",
-  "campus_id": 1,
+  "student_id_number": "2023-00123",
   "course_id": 1,
-  "role_id": 1,
+  "campus_id": 1,
   "platoon_id": 1,
-  "placement": 1,
-  "is_system_admin": false
+  "role_id": 4
 }
 ```
 
-Creating a cadet **automatically creates** an `attendance_qr` row with a fresh UUID
-token (see `CadetController@store`).
+- A random `user_id` UUID is generated (the cadet does not need a Supabase account yet).
+- `campus_id` defaults to `1`, `role_id` to `4` (Cadet), `status` to `active`.
+- Update also accepts `status: active | dropped` (drop / re-enroll).
 
 ### Events
 ```http
-GET    /api/events
-POST   /api/events
-PUT    /api/events/{formation_id}
-DELETE /api/events/{formation_id}
+GET    /events
+POST   /events
+PUT    /events/{formation_id}
+DELETE /events/{formation_id}
 ```
 
-Create payload (sessions are optional but needed for scanning):
+Create payload (`EventController@store`):
 ```json
 {
   "formation_name": "Morning Formation",
-  "formation_date": "2026-10-26",
+  "formation_date": "2026-11-22",
   "formation_type": "whole_day",
-  "created_by": "<supabase uuid>",
-  "sessions": [
-    {
-      "session_type": "morning",
-      "start_time": "06:00",
-      "end_time": "08:00",
-      "late_time": "06:15"
-    }
-  ]
+  "location": "Grandstand",
+  "start_time": "06:00",
+  "end_time": "08:00"
 }
 ```
 
-### Attendance
+### Reports
 ```http
+GET /reports                 # LE 1 attendance points matrix
+GET /reports/export-excel    # color-coded .xls download
+```
+
+Scoring: **present = 10**, **late = `points` or 5**, **absent = `A`**.
+
+### Settings
+```http
+GET /settings
+PUT /settings   # ⚠️ called by the page, but the route is not registered yet
+```
+
+### Scanner JSON API (`routes/api.php`)
+
+Prefixed with `/api`, protected by `['web', 'supabase.auth']` (session + CSRF). In the
+browser, `axios` sends the session cookie automatically.
+
+```http
+GET  /api/events            # events + sessions for the dropdown
 GET  /api/attendance
 POST /api/attendance
 POST /api/attendance/scan
@@ -217,117 +245,56 @@ POST /api/attendance/scan
 Scan payload:
 ```json
 {
-  "qr_token": "<uuid from attendance_qr>",
+  "student_id_number": "2023-00123",
   "session_id": 1,
+  "scan_type": "In",
   "scanned_by": "<supabase uuid>"
 }
 ```
 
 The endpoint:
-1. Finds an **active** QR token.
-2. Loads the cadet (`user_info`) and the session.
-3. Marks `late` if the current time is past `late_time`, otherwise `present`.
-4. `updateOrCreate`s `attendance_records` on `(user_id, session_id)`.
-
-### Reports / Settings
-```http
-GET /api/reports
-GET /api/settings
-PUT /api/settings
-```
+1. Finds the cadet by student ID number (the value encoded in their QR).
+2. Loads the session.
+3. **In:** sets `time_in`; marks `late` if now (Asia/Manila) is past `late_time`,
+   otherwise `present`.
+4. **Out:** sets `time_out` / `time_out_scanned_by`; rejects a second time-out.
 
 ---
 
-## 6. Testing the QR flow today
+## 6. Testing the QR flow
 
-The QR **backend works**, but the frontend currently has:
-- ❌ no camera scanning
-- ❌ no QR image generation
-- ❌ no cadet creation UI
-- ✅ a **manual QR-token input** on `/qr-scanner`
+1. Log in as an admin/officer.
+2. **Cadets → Add Cadet** with a student ID number.
+3. **Events → Create** an event for today with a session.
+4. Get the cadet's QR: log in as that cadet and open the **Cadet Portal** /
+   **Dashboard**, or just type the student ID number into the scanner.
+5. Open **QR Scanner**, pick the session and **In**, start the camera and scan
+   (or type the ID and press Enter).
+6. The result card shows **Present** / **Late**; the scan appears under *Recent Scans*
+   and on **Attendance** and **Reports**.
 
-So you test it with a token copied from the database.
+> Camera access needs a secure context: `http://localhost` / `127.0.0.1` works; a phone
+> on the LAN needs HTTPS.
 
-### Fast path (recommended)
-
-The `DemoSeeder` creates the minimum data using **your own Supabase account**
-(the first row in `auth.users`):
+### DemoSeeder
 
 ```bash
 php artisan db:seed --class=DemoSeeder
 ```
 
-It will:
-- create campus / course / platoon / role lookups if missing
-- create a `user_info` row for that account (if missing) — named **"Demo Cadet"**,
-  which is what the sidebar will display
-- create an `attendance_qr` token
-- create a demo formation + morning session
-- **print the QR token and session ID** to the console
-
-> Re-running the seeder is safe (it uses `firstOrCreate`) and prints the same token.
->
-> To use your real name instead of "Demo Cadet":
-> ```sql
-> update user_info
->    set first_name = 'Your', last_name = 'Name'
->  where email = 'you@usep.edu.ph';
-> ```
-
-Then:
-1. Open `/qr-scanner`
-2. Select the demo session in the dropdown
-3. Paste the printed QR token
-4. Click **Start Scanning**
-5. The result card should show **Present** (or **Late**), and the record appears under
-   *Recent Scans*.
-
-### Manual path (SQL)
-
-```sql
--- 1. reference data
-insert into campus_list (campus_name) values ('Tagum-Mabini Campus') returning campus_id;
-insert into course_list (course_name) values ('BSIT') returning course_id;
-insert into platoon_list (platoon_name) values ('Alpha') returning platoon_id;
-insert into role_list (role_name) values ('Cadet') returning role_id;
-
--- 2. a cadet profile (user_id must exist in auth.users)
-insert into user_info
-  (user_id, first_name, last_name, email, campus_id, course_id, role_id, platoon_id, placement)
-values
-  ('<cadet-uuid>', 'Juan', 'Dela Cruz', 'juan@usep.edu.ph', 1, 1, 1, 1, 1)
-returning info_id;
-
--- 3. QR token
-insert into attendance_qr (user_id, qr_token)
-values ('<cadet-uuid>', gen_random_uuid())
-returning qr_token;
-
--- 4. formation + session
-insert into formations_event
-  (formation_name, formation_date, formation_type, created_by)
-values
-  ('Morning Formation', current_date, 'whole_day', '<your-uuid>')
-returning formation_id;
-
-insert into formation_sessions
-  (formation_id, session_type, start_time, end_time, late_time)
-values
-  (<formation_id>, 'morning', '06:00', '08:00', '06:15')
-returning session_id;
-```
+Creates lookup data, a "Demo Cadet" profile for the first `auth.users` row, and a demo
+formation + morning session. ⚠️ It still prints a UUID **QR token** from the old flow;
+scanning now uses the student ID number, so set `user_info.student_id_number` for the demo
+cadet and scan/type that instead.
 
 ### Quick API test from the browser console
 
-While logged in, open DevTools on any page:
-
 ```js
 await axios.get('/api/events');
-await axios.get('/api/attendance');
-
 await axios.post('/api/attendance/scan', {
-  qr_token: '<paste token>',
+  student_id_number: '2023-00123',
   session_id: 1,
+  scan_type: 'In',
   scanned_by: '<your supabase uuid>',
 });
 ```
@@ -338,7 +305,8 @@ await axios.post('/api/attendance/scan', {
 
 ## 7. Frontend
 
-- **Layout:** `resources/js/Layouts/AuthenticatedLayout.jsx` (sidebar, header)
+- **Layout:** `resources/js/Layouts/AuthenticatedLayout.jsx` (sidebar hides links by
+  role: cadets see Dashboard only, scanners/aspirants see Attendance + QR Scanner)
 - **Design system:** `resources/css/app.css`
   - `btn-primary`, `btn-secondary`, `btn-danger`
   - `card`, `stat-card`
@@ -348,18 +316,21 @@ await axios.post('/api/attendance/scan', {
   - Brand colors: `#7B1E1E` (maroon), `#5C1515` (dark), `#D4A843` (gold)
 - **Pages:** `resources/js/Pages/*.jsx`
 - **Ziggy** provides the global `route()` helper (`@routes` in `app.blade.php`).
+- **QR libraries:** `html5-qrcode` (scanner), `qrcode.react` (installed). Dashboard and
+  Cadet Portal currently use `api.qrserver.com` for the QR image.
 
 ### Page wiring status
 
 | Page | Data source | Status |
 | --- | --- | --- |
-| Dashboard | `stats` prop + mock arrays | 🟡 stats prop ignored |
-| Cadets | static array | ❌ not wired |
-| Events | static array | ❌ not wired |
-| Attendance | static array | ❌ not wired |
-| QR Scanner | `/api/events`, `/api/attendance`, `/api/attendance/scan` | 🟡 wired (manual token) |
-| Reports | static arrays | ❌ not wired |
-| Settings | none | ❌ not wired |
+| Dashboard | Inertia props (stats, activity, events) | ✅ wired |
+| Cadet Portal | Inertia props (cadet, events) | ✅ wired |
+| Cadets | Inertia props + `/cadets` routes | ✅ wired |
+| Events | Inertia props + `/events` routes | ✅ wired |
+| Attendance | Inertia props (session roster) | ✅ wired |
+| QR Scanner | `/api/events`, `/api/attendance`, `/api/attendance/scan` | ✅ camera + manual |
+| Reports | Inertia props + `/reports/export-excel` | ✅ wired (hardcoded 19 sessions) |
+| Settings | Inertia props + `PUT /settings` | 🟡 loads; save route missing |
 
 ---
 
@@ -405,8 +376,8 @@ php artisan db:seed --class=DemoSeeder
 
 See **[TODO.md](TODO.md)**. The short version:
 
-1. Wire the remaining pages to the API (Dashboard first).
-2. Add a cadet creation/edit UI.
-3. Add QR image generation + camera scanning.
-4. Implement Supabase token refresh.
-5. Add role/permission enforcement and tests.
+1. Add the missing `PUT /settings` route.
+2. Tighten role enforcement and the scanner's cadet lookup.
+3. Render QR codes locally with `qrcode.react`.
+4. Make Reports / Excel export use the real session count.
+5. Supabase token refresh, `/profile`, and tests.

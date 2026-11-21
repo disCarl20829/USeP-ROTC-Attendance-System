@@ -7,6 +7,57 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Documentation (`README.md`, `docs/GUIDE.md`, `docs/TODO.md`) updated to reflect
+  the November work: camera scanning, real-data pages, Cadet Portal, Reports,
+  role groups, and current known issues.
+
+---
+
+## [0.4.0] — 2026-11-12
+
+Mostly contributed by Jeeyan11 (Oct 30 – Nov 7), merged on Nov 12.
+
+### Added
+- **Camera QR scanning** on `/qr-scanner` with `html5-qrcode` (rear camera),
+  **In / Out** scan types (time-in and time-out), recent scans list, and manual
+  cadet-ID entry as a fallback. QR codes now encode the cadet's **student ID number**
+  instead of an `attendance_qr` UUID token.
+- **Cadet Portal** (`/cadet/portal`, `CadetPortalController`, `CadetPortal.jsx`) —
+  personal QR code with PNG download and upcoming events.
+- **Reports** rebuilt as the *LE 1: Attendance (30%)* points matrix
+  (10 present / 5 late / `A` absent) with **color-coded Excel export**
+  (`/reports/export-excel`, HTML-table `.xls`).
+- **Cadet management**: add / edit modals, search, **drop and re-enroll**
+  (`user_info.status`: `active` / `dropped`).
+- **Events** page revamp: create / edit / delete formation events with sessions.
+- **`EnsureUserRole` middleware** (`role:` alias) and role-grouped routes in
+  `routes/web.php`; sidebar navigation now hides links by role.
+- Migrations: `drop_user_id_foreign_from_user_info_table` (cadets can exist before
+  they have a Supabase account) and an empty `add_student_id_to_user_info_table` stub.
+- npm dependencies: `html5-qrcode`, `qrcode.react`.
+
+### Changed
+- **All pages use real data** — Dashboard (stats, recent activity, upcoming events,
+  own QR), Cadets, Events, Attendance (session roster, filters, 3+ absence flag),
+  Reports, Settings.
+- Cadet, event, and report CRUD moved from `/api/*` JSON routes to Inertia web routes
+  (`/cadets`, `/events`, `/reports`). `routes/api.php` now only serves the scanner
+  (`/api/events`, `/api/attendance`, `/api/attendance/scan`).
+- `HandleInertiaRequests` shares the user's role / scanner flags.
+
+### Known issues introduced
+- `PUT /settings` is called by the Settings page but no route exists.
+- Role middleware fails open and matches users by loose email prefix.
+- Scanner cadet lookup also matches `email LIKE %input%`.
+- `add_student_id_to_user_info_table` migration is empty (columns added in Supabase by hand).
+- Reports / Excel export hardcode 19 sessions and a 190-point total.
+- Dashboard and Cadet Portal generate QR images via `api.qrserver.com`.
+
+---
+
+## [0.3.1] — 2026-10-25
+
 ### Added
 - Documentation set: `README.md`, `docs/GUIDE.md`, `docs/TODO.md`, `CHANGELOG.md`
 - `DemoSeeder` for quick QR-flow testing
@@ -116,8 +167,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 See **[docs/TODO.md](docs/TODO.md)**. Priorities:
 
-1. QR camera scanning + QR image generation
-2. Dynamic wiring of Dashboard, Cadets, Events, Attendance, Reports, Settings
-3. Supabase token refresh
-4. Role/permission enforcement
+1. Fix Settings save (`PUT /settings` route)
+2. Tighten role/permission enforcement
+3. Make Reports / Excel export use the real session count
+4. Supabase token refresh + `/profile`
 5. Tests and deployment
