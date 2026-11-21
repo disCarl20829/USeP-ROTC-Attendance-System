@@ -1,26 +1,20 @@
 <?php
-# REDACTED: Removed the default comment block for the DatabaseSeeder class.
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * Entry point for `php artisan db:seed`.
+ *
+ * Users live in Supabase (auth.users), not in a Laravel `users` table,
+ * so the stock Breeze "Test User" seeding was removed. This only runs the
+ * DemoSeeder, which builds reference data + a demo event for QR testing.
+ */
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $this->call(DemoSeeder::class);
     }
 }

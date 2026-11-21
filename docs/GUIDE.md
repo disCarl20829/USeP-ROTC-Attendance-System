@@ -5,7 +5,7 @@ the auth flow, Supabase setup, routes and automatic absences.
 
 ---
 
-## 1. How the pieces fit together
+## 1. Architecture
 
 ```text
 Browser (React / Inertia)
@@ -63,7 +63,7 @@ npm run build
 
 ---
 
-## 3. Authentication flow
+## 2. Authentication
 
 All auth goes through Supabase Auth's REST API (`app/Services/Supabase.php`). Laravel
 never stores passwords; it keeps the Supabase tokens in the Laravel session.
@@ -118,12 +118,10 @@ the *Confirm signup* and *Reset password* templates later; the app already accep
 
 ---
 
-## 4. Database
+## 3. Database
 
-The source of truth is `rotcu_usep.sql` (applied in the Supabase SQL Editor). The
-Laravel migrations mirror it.
-
-### Tables and primary keys
+Source of truth: Supabase. Reference SQL: `database/schema/rotcu_usep.sql`.
+Laravel migrations in `database/migrations/` mirror it.
 
 | Table | Primary key | Notes |
 | --- | --- | --- |
@@ -201,7 +199,7 @@ can still change an automatic absence to present/late/excused.
 
 ---
 
-## 8. Common errors and fixes
+## 8. Troubleshooting
 
 | Error | Cause | Fix |
 | --- | --- | --- |

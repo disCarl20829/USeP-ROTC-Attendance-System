@@ -127,8 +127,32 @@ Mostly contributed by Jeeyan11 (Oct 30 – Nov 7), merged on Nov 12.
 ## [0.3.1] — 2026-10-25
 
 ### Added
-- Documentation set: `README.md`, `docs/GUIDE.md`, `docs/TODO.md`, `CHANGELOG.md`
-- `DemoSeeder` for quick QR-flow testing
+- **Cadet Portal** (`/cadet/portal`, `CadetPortalController`, `CadetPortal.jsx`): cadet's own
+  QR code (value = student ID number) and upcoming events
+- **Role-based access** (`EnsureUserRole` middleware, alias `role:`): route groups for
+  cadet / scanner / admin, plus `isAdmin()`, `isScanner()`, `isCadet()` on `UserInfo`
+  and role-aware sidebar
+- **Camera QR scanning** with `html5-qrcode` on `/qr-scanner`
+- **Time-in / time-out**: scans are `In` or `Out`; blocks duplicate IN, OUT without IN,
+  and duplicate OUT; records who scanned (Asia/Manila time)
+- **Drop & re-enroll** cadets (`user_info.status` = `active` / `dropped`)
+- **Reports rewrite**: per-cadet session grid (present 10 pts, late 5, absent `A`), totals,
+  lates/absences, "3+ ABSENCES (DROPPED RISK)" flag, average attendance
+- **Excel export** (`/reports/export-excel`): colour-coded `.xls` in the
+  "LE 1: ATTENDANCE (30%)" layout (15 sessions + F1–F4, 190 pts)
+- Live **Dashboard**: cadet count, active events, today's present/absent, attendance rate,
+  recent activity, user QR card
+- Revamped **Events** creation form
+
+### Changed
+- QR identifies cadets by `student_id_number` (also accepts serial number, email, UUID)
+  instead of the `attendance_qr` UUID token
+- Most CRUD moved from `/api/*` to page routes in `routes/web.php`;
+  `routes/api.php` now only has events, scan and attendance
+- Migrations: dropped the `user_info.user_id` foreign key. A migration
+  `add_student_id_to_user_info_table` was created but is **empty** — the
+  `student_id_number`, `serial_number` and `status` columns used by the code are not in
+  any migration (likely added directly in Supabase)
 
 ---
 

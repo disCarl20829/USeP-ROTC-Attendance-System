@@ -74,7 +74,7 @@ php artisan rotc:make-admin someone@usep.edu.ph
 
 ---
 
-## Quick start
+## 7. Quick start
 
 ### Requirements
 - PHP **8.2+** with `pdo_pgsql`, Composer, Node.js **18+**
@@ -82,7 +82,7 @@ php artisan rotc:make-admin someone@usep.edu.ph
 
 ### 1. Install
 ```bash
-composer install
+composer install          # like npm install, for PHP
 npm install
 ```
 
