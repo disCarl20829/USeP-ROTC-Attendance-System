@@ -55,15 +55,16 @@ page and API call (`permission:` middleware), and the sidebar hides links you ca
 | QR scanner + change a scanned status | ✅ | ✅ | ✅ | — |
 | Attendance roster | ✅ | ✅ | ✅ | — |
 | Cadets: add / edit / drop / re-enroll | ✅ | ✅ | — | — |
-| Set platoon & specialization | ✅ | ✅ | — | — |
+| Set platoon & specialization of others | ✅ | ✅ | — | — |
 | Events, Reports + Excel export | ✅ | ✅ | — | — |
 | Change roles, delete profiles, default session times | ✅ | — | — | — |
 
 Attendance is taken for **Cadets and Aspirants** (`config/rotc.php` →
 `attendance_roles`); Officers and Admins are not on the roster.
 
-Cadets choose their platoon and specialization during sign-up; after that only
-officers/admins can change them. Users without a profile are sent to `/setup`;
+Cadets choose their platoon and specialization during sign-up and can change them
+later in Settings (`config/rotc.php` → `self_assign_platoon`; set it to `false` to let
+only officers/admins change them). Users without a profile are sent to `/setup`;
 unknown roles get nothing (deny by default).
 
 **First admin:** register normally, then run

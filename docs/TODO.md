@@ -26,7 +26,6 @@ Legend: `P0` = needed before real use · `P1` = next up · `P2` = important · `
 
 - [ ] **Supabase dashboard:** Redirect URL `<APP_URL>/auth/callback`, **Gmail SMTP**
       (see GUIDE → Supabase Auth setup); Site URL when deploying
-- [ ] Make caupepito00107@usep.edu.ph Admin after they finish setup
 - [ ] Deploy over **HTTPS** (camera scanning needs it)
 - [ ] `composer update` — `composer audit` reports 9 advisories in laravel/framework
       and symfony packages (existing dependencies)

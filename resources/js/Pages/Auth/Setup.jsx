@@ -139,7 +139,7 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
                 </div>
 
                 <p className="text-xs text-gray-500">
-                    After this, only officers and admins can change your platoon and specialization.
+                    You can change your platoon and specialization later in Settings.
                 </p>
 
                 <div className="flex items-center justify-between pt-2">

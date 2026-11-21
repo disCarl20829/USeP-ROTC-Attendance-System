@@ -22,6 +22,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   password reset. Expired links show a clear message.
 
 ### Changed
+- Everyone can change their own platoon and specialization in Settings
+  (`rotc.self_assign_platoon`).
 - Attendance (roster, reports, auto-absent) covers **Cadets and Aspirants**.
 - Reports page always shows at least 15 numbered columns; dropped cadets in red.
 

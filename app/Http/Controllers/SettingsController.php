@@ -22,16 +22,21 @@ class SettingsController extends Controller
             'options' => LookupOptions::all(),
             'can'     => [
                 'system' => Permissions::allows($profile, 'settings.system'),
-                'assign' => Permissions::allows($profile, 'cadets.assign'),
+                'assign' => self::canChangeOwnPlatoon($profile),
             ],
         ]);
     }
 
-    /** Own profile. Platoon / specialization only for users who may assign them. */
+    private static function canChangeOwnPlatoon($profile): bool
+    {
+        return (bool) config('rotc.self_assign_platoon') || Permissions::allows($profile, 'cadets.assign');
+    }
+
+    /** Own profile, including platoon / specialization (see rotc.self_assign_platoon). */
     public function updateProfile(Request $request)
     {
         $profile   = CurrentProfile::get($request);
-        $canAssign = Permissions::allows($profile, 'cadets.assign');
+        $canAssign = self::canChangeOwnPlatoon($profile);
 
         $data = $request->validate([
             'first_name'  => ['required', 'string', 'max:255'],

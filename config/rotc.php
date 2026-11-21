@@ -21,6 +21,10 @@ return [
     // Specialization given to non-cadets / unassigned profiles.
     'default_specialization' => 'Unspecified',
 
+    // Everyone may change their OWN platoon and specialization in Settings.
+    // Set to false to let only roles with "cadets.assign" change them.
+    'self_assign_platoon' => true,
+
     // Points per attendance status (Reports, Excel export, Dashboard).
     'points' => [
         'present' => 10,
