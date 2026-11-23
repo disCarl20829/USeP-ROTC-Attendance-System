@@ -12,6 +12,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Behind a tunnel / reverse proxy (e.g. VS Code port forwarding), trust its
+        // X-Forwarded-* headers so URLs and redirects use the public https address.
+        // Opt-in: TRUSTED_PROXIES=* (or a comma-separated list of proxy IPs).
+        $proxies = env('TRUSTED_PROXIES');
+        if (is_string($proxies) && $proxies !== '') {
+            $middleware->trustProxies(at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)));
+        }
+
         // Exempt logout from CSRF token verification
         $middleware->validateCsrfTokens(except: [
             '/logout',
