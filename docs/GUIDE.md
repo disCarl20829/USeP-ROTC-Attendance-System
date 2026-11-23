@@ -63,6 +63,33 @@ npm run build
 
 ---
 
+### Sharing the app with VS Code port forwarding
+
+Use this to open the app on phones (camera scanning needs HTTPS, which the tunnel provides).
+
+1. Build the frontend once (no Vite dev server needed): stop `npm run dev`, delete
+   `public/hot` if it exists, then run `npm run build`.
+2. Start Laravel: `php artisan serve` (port 8000).
+3. VS Code → **Ports** tab (next to Terminal) → **Forward a Port** → `8000`
+   → sign in with GitHub if asked.
+4. Right-click the port → **Port Visibility → Public** (otherwise visitors must sign in
+   to GitHub). Copy the **Forwarded Address**, e.g. `https://abc123-8000.asse.devtunnels.ms`.
+5. In `.env`:
+   ```env
+   APP_URL=https://abc123-8000.asse.devtunnels.ms
+   TRUSTED_PROXIES=*
+   ```
+   then `php artisan config:clear` and restart `php artisan serve`.
+6. Supabase → Authentication → URL Configuration → **Redirect URLs**: add
+   `https://abc123-8000.asse.devtunnels.ms/auth/callback`.
+7. Open the forwarded address on any device.
+
+Set the port back to **Private** (or stop forwarding) when you're done: a public port
+lets anyone with the link reach the app. Use `TRUSTED_PROXIES=*` only behind a tunnel
+or proxy, never when the app is exposed directly.
+
+---
+
 ## 2. Authentication
 
 All auth goes through Supabase Auth's REST API (`app/Services/Supabase.php`). Laravel
