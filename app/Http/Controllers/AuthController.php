@@ -46,7 +46,16 @@ class AuthController extends Controller
     {
         $code = (string) ($response->json('error_code') ?? $response->json('code') ?? '');
 
+        $msg = (string) ($response->json('msg') ?? $response->json('message') ?? '');
+
+        // Supabase: "For security purposes, you can only request this after 42 seconds."
+        if (preg_match('/after (\d+) seconds?/i', $msg, $m)) {
+            return "Please wait {$m[1]} seconds before requesting another email (one email per minute).";
+        }
+
         return match (true) {
+            $code === 'over_email_send_rate_limit'
+                => 'The hourly email limit was reached (Supabase → Authentication → Rate Limits). Try again later.',
             $response->status() === 429, str_contains($code, 'rate_limit')
                 => 'Too many attempts. Please wait a minute and try again.',
             $code === 'weak_password'
@@ -348,8 +357,10 @@ class AuthController extends Controller
         }
 
         if ($response->status() === 429) {
-            // Supabase's own email limit (per user: 1 per 60 s; per project: see Auth → Rate Limits).
-            return back()->withErrors(['email' => 'The email service is busy (Supabase sending limit). Wait a few minutes and try again.']);
+            // Supabase's own email limits (per user: 1 per 60 s; per project: Auth → Rate Limits).
+            Log::notice('Supabase recover rate-limited.', ['error_code' => $response->json('error_code')]);
+
+            return back()->withErrors(['email' => $this->errorMessage($response, 'Too many requests. Wait a minute and try again.')]);
         }
 
         // Same answer whether or not the account exists.
