@@ -348,7 +348,8 @@ class AuthController extends Controller
         }
 
         if ($response->status() === 429) {
-            return back()->withErrors(['email' => 'Too many requests. Please wait a minute and try again.']);
+            // Supabase's own email limit (per user: 1 per 60 s; per project: see Auth → Rate Limits).
+            return back()->withErrors(['email' => 'The email service is busy (Supabase sending limit). Wait a few minutes and try again.']);
         }
 
         // Same answer whether or not the account exists.
