@@ -13,6 +13,17 @@ class AttendanceRecord extends Model
     protected $table = 'attendance_records';
     protected $primaryKey = 'record_id';
 
+    /** Records of archived people or archived events are hidden. */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('notArchived', fn ($q) => $q
+            ->whereIn('attendance_records.user_id', fn ($s) => $s->select('user_id')->from('user_info')->whereNull('archived_at'))
+            ->whereIn('attendance_records.session_id', fn ($s) => $s->select('formation_sessions.session_id')
+                ->from('formation_sessions')
+                ->join('formations_event', 'formations_event.formation_id', '=', 'formation_sessions.formation_id')
+                ->whereNull('formations_event.archived_at')));
+    }
+
     // Disable default created_at and updated_at column expectations
     public $timestamps = false;
 

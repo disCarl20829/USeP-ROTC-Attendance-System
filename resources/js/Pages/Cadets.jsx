@@ -16,7 +16,42 @@ import {
     XMarkIcon 
 } from '@heroicons/react/24/outline';
 
-export default function Cadets({ cadets = [], courses = [], campuses = [], platoons = [], specializations = [], roles = [], can = {} }) {
+export default function Cadets({ cadets = [], archived = [], courses = [], campuses = [], platoons = [], specializations = [], roles = [], can = {} }) {
+    // Archive (admin only): selection, bulk confirmation, archived list
+    const [selected, setSelected] = useState([]);
+    const [showArchived, setShowArchived] = useState(false);
+    const [archiveTargets, setArchiveTargets] = useState(null); // array of {id, name}
+    const [archiveConfirm, setArchiveConfirm] = useState('');
+    const [archiving, setArchiving] = useState(false);
+
+    const toggleSelected = (id) =>
+        setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+    const openArchive = (targets) => {
+        setArchiveTargets(targets);
+        setArchiveConfirm('');
+    };
+
+    const archiveWord = archiveTargets ? `ARCHIVE ${archiveTargets.length}` : '';
+
+    const submitArchive = () => {
+        if (!archiveTargets) return;
+        setArchiving(true);
+        const done = {
+            preserveScroll: true,
+            onSuccess: () => {
+                setArchiveTargets(null);
+                setSelected([]);
+            },
+            onFinish: () => setArchiving(false),
+        };
+        if (archiveTargets.length === 1) {
+            router.delete(route('cadets.destroy', archiveTargets[0].id), done);
+        } else {
+            router.post(route('cadets.archive'), { ids: archiveTargets.map((t) => t.id), confirm: archiveConfirm }, done);
+        }
+    };
+
     // Modal & Action States
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -213,10 +248,21 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                     <h2 className="text-2xl font-bold text-gray-900">Cadet Management</h2>
                     <p className="text-sm text-gray-500">Manage ROTC cadets, view enrollment statuses, and update profiles</p>
                 </div>
-                <button onClick={openAddModal} className="btn-primary flex items-center justify-center gap-2">
-                    <PlusIcon className="h-4 w-4" />
-                    Add Cadet
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                    {can.delete && (
+                        <button
+                            type="button"
+                            onClick={() => setShowArchived((v) => !v)}
+                            className="btn-secondary px-4 py-2.5"
+                        >
+                            {showArchived ? 'Back to active cadets' : `Archived (${archived.length})`}
+                        </button>
+                    )}
+                    <button onClick={openAddModal} className="btn-primary flex items-center justify-center gap-2">
+                        <PlusIcon className="h-4 w-4" />
+                        Add Cadet
+                    </button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -273,12 +319,75 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                 </div>
             </div>
 
+            {showArchived && (
+                <div className="card mb-6 overflow-hidden">
+                    <div className="border-b border-gray-100 p-4">
+                        <h3 className="font-semibold text-gray-900">Archived profiles</h3>
+                        <p className="text-xs text-gray-500">Hidden from attendance and reports. Restore within 30 days; after that they are deleted.</p>
+                    </div>
+                    {archived.length === 0 ? (
+                        <p className="p-6 text-center text-sm text-gray-400">Nothing archived.</p>
+                    ) : (
+                        <ul className="divide-y divide-gray-100">
+                            {archived.map((a) => (
+                                <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+                                    <div>
+                                        <p className="font-semibold text-gray-900">{a.name}</p>
+                                        <p className="text-xs text-gray-500">
+                                            {a.student_id} · {a.role} · archived {a.archived_at} · restorable until {a.restorable_until}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.post(route('cadets.restore', a.id), {}, { preserveScroll: true })}
+                                        className="btn-secondary px-3 py-1.5 text-xs"
+                                    >
+                                        Restore
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
+
+            {can.delete && selected.length > 0 && !showArchived && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm">
+                    <span className="font-semibold text-red-800">{selected.length} selected</span>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => setSelected([])} className="btn-secondary px-3 py-1.5 text-xs">
+                            Clear
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => openArchive(cadets.filter((c) => selected.includes(c.id)).map((c) => ({ id: c.id, name: c.name })))}
+                            className="rounded-xl bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800"
+                        >
+                            Archive selected
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Cadets Table */}
             <div className="card overflow-hidden bg-white shadow rounded-lg border border-gray-200">
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-200">
+                                {can.delete && (
+                                    <th className="w-10 p-3.5">
+                                        <input
+                                            type="checkbox"
+                                            aria-label="Select all shown"
+                                            checked={filteredCadets.length > 0 && filteredCadets.every((c) => selected.includes(c.id))}
+                                            onChange={(e) =>
+                                                setSelected(e.target.checked ? filteredCadets.map((c) => c.id) : [])
+                                            }
+                                            className="h-4 w-4 rounded border-gray-300 text-[#7B1E1E] focus:ring-[#7B1E1E]"
+                                        />
+                                    </th>
+                                )}
                                 <th className="p-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cadet</th>
                                 <th className="p-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ID Number</th>
                                 <th className="p-3.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course</th>
@@ -290,7 +399,7 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                         <tbody className="divide-y divide-gray-100">
                             {filteredCadets.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="py-8 text-center text-sm text-gray-500">
+                                    <td colSpan={can.delete ? 7 : 6} className="py-8 text-center text-sm text-gray-500">
                                         No cadets found matching the selected criteria.
                                     </td>
                                 </tr>
@@ -306,6 +415,17 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                                             key={cadetId} 
                                             className={`transition ${isDropped ? 'bg-gray-50/80 text-gray-400' : 'hover:bg-gray-50'}`}
                                         >
+                                            {can.delete && (
+                                                <td className="p-3.5">
+                                                    <input
+                                                        type="checkbox"
+                                                        aria-label={`Select ${cadetName}`}
+                                                        checked={selected.includes(cadetId)}
+                                                        onChange={() => toggleSelected(cadetId)}
+                                                        className="h-4 w-4 rounded border-gray-300 text-[#7B1E1E] focus:ring-[#7B1E1E]"
+                                                    />
+                                                </td>
+                                            )}
                                             <td className="p-3.5">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${
@@ -347,6 +467,16 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                                             </td>
                                             <td className="p-3.5 text-center">
                                                 <div className="flex items-center justify-center gap-2">
+                                                    {can.delete && cadet.role?.toLowerCase() !== 'admin' && (
+                                                        <button
+                                                            onClick={() => openArchive([{ id: cadetId, name: cadetName }])}
+                                                            className="rounded-lg px-2.5 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-100"
+                                                            title="Archive (restorable for 30 days)"
+                                                        >
+                                                            Archive
+                                                        </button>
+                                                    )}
+
                                                     {/* Edit Button */}
                                                     <button
                                                         onClick={() => openEditModal(cadet)}
@@ -387,6 +517,46 @@ export default function Cadets({ cadets = [], courses = [], campuses = [], plato
                     </table>
                 </div>
             </div>
+
+            {/* Archive confirmation */}
+            <Modal show={!!archiveTargets} onClose={() => setArchiveTargets(null)}>
+                {archiveTargets && (
+                    <div className="p-6">
+                        <h3 className="text-lg font-bold text-gray-900">
+                            Archive {archiveTargets.length === 1 ? archiveTargets[0].name : `${archiveTargets.length} profiles`}?
+                        </h3>
+                        <p className="mt-2 text-sm text-gray-600">
+                            They disappear from attendance, the scanner and reports, and can&apos;t log in. You can restore them
+                            for 30 days; after that they are deleted for good (login accounts after one year).
+                        </p>
+                        {archiveTargets.length > 1 && (
+                            <div className="mt-4">
+                                <label className="label-text" htmlFor="archive_confirm">
+                                    Type <code className="font-mono text-red-700">{archiveWord}</code> to confirm
+                                </label>
+                                <input
+                                    id="archive_confirm"
+                                    value={archiveConfirm}
+                                    onChange={(e) => setArchiveConfirm(e.target.value)}
+                                    className="input-field font-mono"
+                                    autoFocus
+                                />
+                            </div>
+                        )}
+                        <div className="mt-6 flex justify-end gap-3">
+                            <SecondaryButton onClick={() => setArchiveTargets(null)}>Cancel</SecondaryButton>
+                            <button
+                                type="button"
+                                disabled={archiving || (archiveTargets.length > 1 && archiveConfirm !== archiveWord)}
+                                onClick={submitArchive}
+                                className="rounded-xl bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-40"
+                            >
+                                {archiving ? 'Archiving…' : 'Archive'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
 
             {/* Add Cadet Modal */}
             <Modal show={isAddModalOpen} onClose={closeAddModal}>

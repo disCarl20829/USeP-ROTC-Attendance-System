@@ -10,6 +10,15 @@ class FormationSession extends Model
 
     protected $primaryKey = 'session_id';
 
+    /** Sessions of archived events are hidden. */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('notArchived', fn ($q) => $q->whereIn(
+            'formation_sessions.formation_id',
+            fn ($sub) => $sub->select('formation_id')->from('formations_event')->whereNull('archived_at')
+        ));
+    }
+
     public $timestamps = false;
 
     protected $fillable = [

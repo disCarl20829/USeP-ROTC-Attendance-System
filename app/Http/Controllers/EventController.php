@@ -122,6 +122,7 @@ class EventController extends Controller
                 'formation_date' => $data['formation_date'],
                 'formation_type' => $data['formation_type'],
                 'location'       => $data['location'] ?? null,
+                'school_year_id' => \App\Models\SchoolYear::active()?->school_year_id,
                 'created_by'     => $request->session()->get('supabase_user_id'),
             ]);
 

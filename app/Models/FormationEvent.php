@@ -10,6 +10,11 @@ class FormationEvent extends Model
 
     protected $primaryKey = 'formation_id';
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope('notArchived', fn ($q) => $q->whereNull('formations_event.archived_at'));
+    }
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -17,6 +22,8 @@ class FormationEvent extends Model
         'formation_date',
         'formation_type',
         'location',
+        'school_year_id',
+        'archived_at',
         'created_by',
         'date_added',
     ];

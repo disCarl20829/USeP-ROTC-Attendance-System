@@ -13,6 +13,17 @@ class UserInfo extends Model
     protected $table = 'user_info';
     protected $primaryKey = 'info_id';
 
+    /** Archived profiles are hidden everywhere unless a query opts in with withArchived(). */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('notArchived', fn ($q) => $q->whereNull('user_info.archived_at'));
+    }
+
+    public function scopeWithArchived($query)
+    {
+        return $query->withoutGlobalScope('notArchived');
+    }
+
     public const CREATED_AT = 'date_added';
     public const UPDATED_AT = 'updated_at';
 
@@ -31,6 +42,9 @@ class UserInfo extends Model
         'status',
         'dropped_at',
         'active_since',
+        'school_year_id',
+        'archived_at',
+        'archived_by',
     ];
 
     protected $casts = [
@@ -38,6 +52,7 @@ class UserInfo extends Model
         'updated_at'   => 'datetime',
         'dropped_at'   => 'datetime',
         'active_since' => 'datetime',
+        'archived_at'  => 'datetime',
     ];
 
     public function campus()
@@ -132,12 +147,12 @@ class UserInfo extends Model
 
     public static function findByEmail(string $email): ?self
     {
-        return static::whereRaw('lower(trim(email)) = ?', [strtolower(trim($email))])->first();
+        return static::withArchived()->whereRaw('lower(trim(email)) = ?', [strtolower(trim($email))])->first();
     }
 
     public static function findByStudentId(string $studentId): ?self
     {
-        return static::whereRaw('lower(trim(student_id)) = ?', [strtolower(trim($studentId))])->first();
+        return static::withArchived()->whereRaw('lower(trim(student_id)) = ?', [strtolower(trim($studentId))])->first();
     }
 
     /** Summary used by Inertia pages. */

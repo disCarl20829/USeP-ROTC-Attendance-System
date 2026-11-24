@@ -7,6 +7,7 @@ use App\Http\Controllers\CadetController;
 use App\Http\Controllers\CadetPortalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\SchoolYearController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SetupController;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +33,15 @@ Route::middleware('supabase.auth')->group(function () {
         Route::put('/settings/system', [SettingsController::class, 'updateSystem'])
             ->middleware('permission:settings.system')->name('settings.system');
 
+        // School years (admin)
+        Route::middleware('permission:school_year.manage')->prefix('settings/school-year')->name('school-year.')->group(function () {
+            Route::post('/', [SchoolYearController::class, 'store'])->name('store');
+            Route::put('/{id}', [SchoolYearController::class, 'update'])->whereNumber('id')->name('update');
+            Route::get('/backup', [SchoolYearController::class, 'backup'])->name('backup');
+            Route::post('/close', [SchoolYearController::class, 'close'])->middleware('throttle:account')->name('close');
+            Route::post('/{id}/restore', [SchoolYearController::class, 'restore'])->whereNumber('id')->name('restore');
+        });
+
         // Scanner + roster
         Route::get('/qr-scanner', [QrScanController::class, 'showScannerPage'])
             ->middleware('permission:scan')->name('qr-scanner');
@@ -44,6 +54,8 @@ Route::middleware('supabase.auth')->group(function () {
             Route::post('/cadets', [CadetController::class, 'store'])->name('cadets.store');
             Route::put('/cadets/{infoId}', [CadetController::class, 'update'])->whereNumber('infoId')->name('cadets.update');
             Route::delete('/cadets/{infoId}', [CadetController::class, 'destroy'])->whereNumber('infoId')->name('cadets.destroy');
+            Route::post('/cadets/archive', [CadetController::class, 'archiveMany'])->name('cadets.archive');
+            Route::post('/cadets/{infoId}/restore', [CadetController::class, 'restore'])->whereNumber('infoId')->name('cadets.restore');
         });
 
         // Events

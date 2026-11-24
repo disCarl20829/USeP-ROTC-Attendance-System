@@ -39,7 +39,8 @@ return [
         'attendance.view' => ['officer', 'aspirant'],
         'cadets.manage'   => ['officer'],             // add / edit / drop cadets
         'cadets.assign'   => ['officer'],             // set platoon & specialization
-        'cadets.delete'   => [],                      // permanently delete a profile (admin only)
+        'cadets.delete'   => [],                      // archive / restore profiles (admin only)
+        'school_year.manage' => [],                   // open / close / restore school years (admin only)
         'roles.assign'    => [],                      // change a user's role (admin only)
         'events.manage'   => ['officer'],
         'reports.view'    => ['officer'],

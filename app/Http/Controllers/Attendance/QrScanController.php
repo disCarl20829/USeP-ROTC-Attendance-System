@@ -167,7 +167,9 @@ class QrScanController extends Controller
             return $qr ? UserInfo::where('user_id', $qr->user_id)->first() : null;
         }
 
-        return UserInfo::findByStudentId($code);
+        $cadet = UserInfo::findByStudentId($code);
+
+        return $cadet && !$cadet->archived_at ? $cadet : null;
     }
 
     private function isLate(FormationSession $session, Carbon $now): bool

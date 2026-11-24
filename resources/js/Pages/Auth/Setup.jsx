@@ -5,7 +5,7 @@ import RegisterSteps from '@/Components/RegisterSteps';
 import StatusMessage from '@/Components/StatusMessage';
 
 /** Register step 3: technical info. Role is always Cadet. */
-export default function Setup({ email, prefill = {}, linked = false, options = {} }) {
+export default function Setup({ email, prefill = {}, linked = false, options = {}, schoolYear = null }) {
     const str = (v) => (v === null || v === undefined ? '' : String(v));
 
     const { data, setData, post, processing, errors } = useForm({
@@ -48,6 +48,17 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
                 <p className="text-sm text-gray-500">
                     Signed in as <strong>{email}</strong>. Your role will be <strong>Cadet</strong>.
                 </p>
+                {!linked && schoolYear && (
+                    <p className="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
+                        Registration for <strong>{schoolYear.name}</strong> is open to first years only: your student ID must
+                        start with <strong>{schoolYear.enrollment_year}-</strong> and match the number in your USeP email.
+                    </p>
+                )}
+                {!linked && !schoolYear && (
+                    <p className="mt-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                        Registration is closed (no active school year). Contact an ROTC officer.
+                    </p>
+                )}
                 {linked && (
                     <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
                         An officer already added you to the roster. Check the details below; your existing attendance
@@ -87,7 +98,7 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
                     </FormField>
                 </div>
 
-                <FormField id="student_id" label="Student ID" error={errors.student_id} hint="e.g. 2023-00123">
+                <FormField id="student_id" label="Student ID" error={errors.student_id} hint={schoolYear ? `e.g. ${schoolYear.enrollment_year}-00123` : undefined}>
                     <input
                         id="student_id"
                         value={data.student_id}

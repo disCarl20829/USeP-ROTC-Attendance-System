@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\EnsureProfileComplete;
+use App\Models\SchoolYear;
 use App\Models\UserInfo;
+use App\Support\Enrollment;
 use App\Support\CurrentProfile;
 use App\Support\LookupOptions;
 use Illuminate\Http\Request;
@@ -23,6 +26,10 @@ class SetupController extends Controller
             return redirect()->route('dashboard');
         }
 
+        if (EnsureProfileComplete::isArchived($request)) {
+            return EnsureProfileComplete::rejectArchived($request);
+        }
+
         $email    = (string) $request->session()->get('supabase_email');
         $meta     = (array) $request->session()->get('supabase_user_meta', []);
         $existing = $this->linkableProfile($request, $email);
@@ -40,6 +47,7 @@ class SetupController extends Controller
                 'specialization_id' => $existing?->specialization_id,
             ],
             'linked'   => (bool) $existing,
+            'schoolYear' => SchoolYear::active()?->toArrayForUi(),
             'options'  => LookupOptions::all(),
         ]);
     }
@@ -50,15 +58,25 @@ class SetupController extends Controller
             return redirect()->route('dashboard');
         }
 
+        if (EnsureProfileComplete::isArchived($request)) {
+            return EnsureProfileComplete::rejectArchived($request);
+        }
+
         $userId   = (string) $request->session()->get('supabase_user_id');
         $email    = (string) $request->session()->get('supabase_email');
         $existing = $this->linkableProfile($request, $email);
+
+        // Self-registration is for first years only. Officers vetted hand-added cadets already.
+        $studentIdRules = LookupOptions::studentIdRules($existing?->info_id);
+        if (!$existing) {
+            $studentIdRules[] = Enrollment::rule($email);
+        }
 
         $data = $request->validate([
             'first_name'        => ['required', 'string', 'max:255'],
             'middle_name'       => ['nullable', 'string', 'max:255'],
             'last_name'         => ['required', 'string', 'max:255'],
-            'student_id'        => LookupOptions::studentIdRules($existing?->info_id),
+            'student_id'        => $studentIdRules,
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
             'platoon_id'        => ['required', 'integer', 'exists:platoon_list,platoon_id'],
             'specialization_id' => ['required', 'integer', 'exists:specialization_list,specialization_id'],
@@ -70,7 +88,11 @@ class SetupController extends Controller
         }
 
         $profile = DB::transaction(function () use ($existing, $data, $userId, $email, $cadetRoleId) {
-            $profile = $existing ?? new UserInfo(['role_id' => $cadetRoleId, 'status' => 'active']);
+            $profile = $existing ?? new UserInfo([
+                'role_id'        => $cadetRoleId,
+                'status'         => 'active',
+                'school_year_id' => SchoolYear::active()?->school_year_id,
+            ]);
 
             // Linking a hand-added profile: user_id changes, records follow (ON UPDATE CASCADE).
             $profile->user_id           = $userId;
@@ -105,7 +127,7 @@ class SetupController extends Controller
 
         $profile = UserInfo::findByEmail($email);
 
-        if (!$profile) {
+        if (!$profile || $profile->archived_at) {
             return null;
         }
 

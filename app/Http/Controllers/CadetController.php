@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
+use App\Models\SchoolYear;
 use App\Models\Specialization;
 use App\Models\UserInfo;
 use App\Support\CurrentProfile;
@@ -36,9 +38,25 @@ class CadetController extends Controller
             ]);
 
         $profile = CurrentProfile::get($request);
+        $tz      = config('rotc.timezone');
+
+        $archived = UserInfo::withArchived()->with('role')
+            ->whereNotNull('archived_at')
+            ->where('archived_at', '>', now()->subDays(SchoolYear::RESTORE_DAYS))
+            ->orderByDesc('archived_at')
+            ->get()
+            ->map(fn (UserInfo $u) => [
+                'id'               => $u->info_id,
+                'name'             => trim("{$u->last_name}, {$u->first_name}"),
+                'student_id'       => (string) $u->student_id,
+                'role'             => $u->role?->role_name,
+                'archived_at'      => $u->archived_at->setTimezone($tz)->format('M d, Y'),
+                'restorable_until' => $u->archived_at->copy()->addDays(SchoolYear::RESTORE_DAYS)->setTimezone($tz)->format('M d, Y'),
+            ]);
 
         return Inertia::render('Cadets', [
-            'cadets' => $cadets,
+            'cadets'   => $cadets,
+            'archived' => $archived,
             ...LookupOptions::all(),
             'can'    => [
                 'assign' => Permissions::allows($profile, 'cadets.assign'),
@@ -85,6 +103,7 @@ class CadetController extends Controller
                 'specialization_id' => ($canAssign ? ($data['specialization_id'] ?? null) : null) ?? Specialization::defaultId(),
                 'role_id'           => ($canRoles ? ($data['role_id'] ?? null) : null) ?? LookupOptions::roleId(config('rotc.default_role')),
                 'status'            => 'active',
+                'school_year_id'    => SchoolYear::active()?->school_year_id,
             ]);
 
             $cadet->ensureQrToken();
@@ -150,22 +169,69 @@ class CadetController extends Controller
         return back()->with('success', 'Cadet updated.');
     }
 
+    /** Archive one profile (restorable for 30 days, then deleted). */
     public function destroy(Request $request, int $infoId)
+    {
+        return $this->archive($request, [$infoId], null);
+    }
+
+    /** Archive several profiles at once; requires typing "ARCHIVE <count>". */
+    public function archiveMany(Request $request)
+    {
+        $data = $request->validate([
+            'ids'     => ['required', 'array', 'min:1', 'max:1000'],
+            'ids.*'   => ['integer'],
+            'confirm' => ['required', 'string'],
+        ]);
+
+        $ids = array_values(array_unique($data['ids']));
+
+        if (trim($data['confirm']) !== 'ARCHIVE ' . count($ids)) {
+            return back()->withErrors(['confirm' => 'Type ARCHIVE ' . count($ids) . ' exactly to confirm.']);
+        }
+
+        return $this->archive($request, $ids, 'bulk');
+    }
+
+    private function archive(Request $request, array $ids, ?string $mode)
     {
         $actor = CurrentProfile::get($request);
 
         if (!Permissions::allows($actor, 'cadets.delete')) {
-            return back()->with('error', 'Only admins can permanently delete a profile. Drop the cadet instead.');
+            return back()->with('error', 'Only admins can archive profiles. Drop the cadet instead.');
         }
 
-        $cadet = UserInfo::findOrFail($infoId);
+        $targets = UserInfo::with('role')->whereIn('info_id', $ids)->get()
+            ->reject(fn ($u) => $u->info_id === $actor->info_id || Permissions::roleOf($u) === 'admin');
 
-        if ($cadet->info_id === $actor->info_id) {
-            return back()->with('error', 'You cannot delete your own profile.');
+        if ($targets->isEmpty()) {
+            return back()->with('error', 'Nothing to archive (you cannot archive yourself or an admin).');
         }
 
-        $cadet->delete(); // attendance + QR rows cascade
+        UserInfo::whereIn('info_id', $targets->pluck('info_id'))->update([
+            'archived_at' => now(),
+            'archived_by' => $request->session()->get('supabase_user_id'),
+        ]);
 
-        return back()->with('success', 'Profile deleted.');
+        AuditLog::record($request, $mode === 'bulk' ? 'cadets.archive_bulk' : 'cadets.archive', [
+            'count'       => $targets->count(),
+            'student_ids' => $targets->pluck('student_id')->values()->all(),
+        ]);
+
+        return back()->with('success', $targets->count() . ' profile(s) archived. You can restore them for ' . SchoolYear::RESTORE_DAYS . ' days.');
+    }
+
+    public function restore(Request $request, int $infoId)
+    {
+        if (!Permissions::allows(CurrentProfile::get($request), 'cadets.delete')) {
+            return back()->with('error', 'Only admins can restore profiles.');
+        }
+
+        $profile = UserInfo::withArchived()->whereNotNull('archived_at')->findOrFail($infoId);
+        $profile->update(['archived_at' => null, 'archived_by' => null]);
+
+        AuditLog::record($request, 'cadets.restore', ['student_id' => $profile->student_id]);
+
+        return back()->with('success', "{$profile->full_name} restored.");
     }
 }

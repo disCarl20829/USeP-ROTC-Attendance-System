@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import FormField, { SelectField, toOptions } from '@/Components/FormField';
+import SchoolYearPanel from '@/Components/SchoolYearPanel';
 
-export default function Settings({ profile = {}, utility = {}, options = {}, can = {} }) {
+export default function Settings({ profile = {}, utility = {}, options = {}, can = {}, schoolYears = null }) {
     const str = (v) => (v === null || v === undefined ? '' : String(v));
 
     const profileForm = useForm({
@@ -153,6 +154,8 @@ export default function Settings({ profile = {}, utility = {}, options = {}, can
                         </div>
                     </form>
                 </div>
+
+                {schoolYears && <SchoolYearPanel data={schoolYears} />}
 
                 {can.system && (
                     <div className="card p-6">

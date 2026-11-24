@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Specialization;
 use App\Models\Utility;
 use App\Support\CurrentProfile;
+use App\Support\Enrollment;
 use App\Support\LookupOptions;
 use App\Support\Permissions;
 use Illuminate\Http\Request;
@@ -20,6 +21,9 @@ class SettingsController extends Controller
             'profile' => $profile->toProfileArray(),
             'utility' => $this->utility(),
             'options' => LookupOptions::all(),
+            'schoolYears' => Permissions::allows($profile, 'school_year.manage')
+                ? SchoolYearController::settingsProps($request)
+                : null,
             'can'     => [
                 'system' => Permissions::allows($profile, 'settings.system'),
                 'assign' => self::canChangeOwnPlatoon($profile),
@@ -38,11 +42,19 @@ class SettingsController extends Controller
         $profile   = CurrentProfile::get($request);
         $canAssign = self::canChangeOwnPlatoon($profile);
 
+        // Cadets/aspirants changing their own student ID must stay within the rules.
+        $studentIdRules = LookupOptions::studentIdRules($profile->info_id);
+        $isTrainee      = in_array(Permissions::roleOf($profile), config('rotc.attendance_roles'), true);
+        if ($isTrainee && trim((string) $request->input('student_id')) !== (string) $profile->student_id
+            && !Permissions::allows($profile, 'cadets.manage')) {
+            $studentIdRules[] = Enrollment::rule((string) $profile->email);
+        }
+
         $data = $request->validate([
             'first_name'  => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name'   => ['required', 'string', 'max:255'],
-            'student_id' => LookupOptions::studentIdRules($profile->info_id),
+            'student_id' => $studentIdRules,
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
             ...($canAssign ? [
                 'platoon_id'        => ['nullable', 'integer', 'exists:platoon_list,platoon_id'],
