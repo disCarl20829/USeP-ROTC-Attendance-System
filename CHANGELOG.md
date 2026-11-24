@@ -20,6 +20,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Daily `purge_archived_records()` job: deletes archives after 30 days, login accounts
   one year after archiving.
 - **Activity log** (`audit_logs`) for backups, archives, restores and purges.
+- **Semi-automatic school years:** `ensure_school_year()` (daily) starts the next year on
+  its start date, reusing the last year's dates; admins get a reminder banner 2 weeks
+  before the end and when a year is overdue. Closing stays manual.
 
 ### Added
 - Branded maroon & gold Supabase email templates (code + button) in `docs/email-templates/`.

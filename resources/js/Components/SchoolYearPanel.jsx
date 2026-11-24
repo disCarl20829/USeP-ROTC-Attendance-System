@@ -12,6 +12,7 @@ const ACTION_LABELS = {
     'cadets.archive_bulk': 'Archived profiles (bulk)',
     'cadets.restore': 'Restored a profile',
     purge: 'Deleted expired archives',
+    'school_year.auto_start': 'School year started automatically',
 };
 
 function nextYearDefaults(active) {
@@ -59,7 +60,8 @@ export default function SchoolYearPanel({ data }) {
         <div className="card p-6">
             <h2 className="text-lg font-semibold text-gray-900">School year</h2>
             <p className="mb-5 text-sm text-gray-500">
-                Only first years of the active school year can register as cadets. Closing a year archives its cadets,
+                Only first years of the active school year can register as cadets. The next school year starts
+                automatically (default Aug 1); you get a reminder 2 weeks before a year ends. Closing a year archives its cadets,
                 aspirants, events and attendance (restorable for 30 days, then deleted; login accounts are deleted after
                 one year).
             </p>
@@ -146,7 +148,8 @@ export default function SchoolYearPanel({ data }) {
                     className="space-y-4"
                 >
                     <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-                        No active school year: cadet registration is closed. Start the next school year to open it.
+                        No active school year: cadet registration is closed. The next school year starts automatically on
+                        its start date (default Aug 1), or start it now below.
                     </p>
                     <YearFields form={newForm} prefix="new_year" />
                     <div className="flex justify-end">

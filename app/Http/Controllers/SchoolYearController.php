@@ -163,8 +163,12 @@ class SchoolYearController extends Controller
         $request->session()->forget('school_year_backup');
         AuditLog::record($request, 'school_year.close', ['name' => $year->name, 'profiles' => $people, 'events' => $events]);
 
+        // If the next year's start date has already come, open it right away.
+        $next = DB::selectOne('SELECT public.ensure_school_year() AS name')?->name;
+
         return back()->with('success', "School year {$year->name} archived ({$people} profiles, {$events} events). "
-            . 'You can restore it for ' . SchoolYear::RESTORE_DAYS . ' days. Start the next school year to open registration.');
+            . 'You can restore it for ' . SchoolYear::RESTORE_DAYS . ' days. '
+            . ($next ? "School year {$next} has started: new first years can register now." : 'The next school year will start automatically on its start date.'));
     }
 
     public function restore(Request $request, int $id)

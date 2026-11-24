@@ -80,6 +80,8 @@ php artisan rotc:make-admin someone@usep.edu.ph
   must be `YYYY-NNNNN` with `YYYY` = the year's **enrollment year** (e.g. `2026-00107`),
   and the number must match the USeP email (`caupepito00107@usep.edu.ph`).
 - Admins manage school years in **Settings → School year** (default August–May).
+  The **next school year starts automatically** on its start date (daily job), and admins
+  see a reminder banner 2 weeks before a year ends. Closing a year stays manual.
 - **Close school year**: download the backup (Excel), type `ARCHIVE <year>`. Its cadets,
   aspirants, events and attendance are **archived**: hidden, not scannable, can't log in.
   Officers and admins are never archived.

@@ -124,10 +124,28 @@ export default function AuthenticatedLayout({ header, children }) {
                 </header>
 
                 <main className="p-4 sm:p-6 lg:p-8">
+                    <SchoolYearBanner notice={usePage().props.schoolYearNotice} />
                     <StatusMessage />
                     {children}
                 </main>
             </div>
+        </div>
+    );
+}
+
+function SchoolYearBanner({ notice }) {
+    if (!notice) return null;
+    const styles = {
+        danger: 'border-red-300 bg-red-50 text-red-800',
+        warning: 'border-amber-300 bg-amber-50 text-amber-800',
+        info: 'border-blue-200 bg-blue-50 text-blue-800',
+    };
+    return (
+        <div className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-sm ${styles[notice.level] ?? styles.info}`}>
+            <span>{notice.message}</span>
+            <Link href={route('settings')} className="shrink-0 font-semibold underline">
+                Open School year settings
+            </Link>
         </div>
     );
 }

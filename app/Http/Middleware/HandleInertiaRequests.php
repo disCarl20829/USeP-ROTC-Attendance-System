@@ -24,6 +24,9 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => fn () => $this->sharedUser($request),
             ],
+            'schoolYearNotice' => fn () => Permissions::allows(CurrentProfile::get($request), 'school_year.manage')
+                ? \App\Models\SchoolYear::adminNotice()
+                : null,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),
