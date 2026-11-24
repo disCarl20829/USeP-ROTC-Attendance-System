@@ -91,6 +91,10 @@ class CadetController extends Controller
         $canRoles  = Permissions::allows($actor, 'roles.assign');
 
         DB::transaction(function () use ($data, $canAssign, $canRoles) {
+            $roleId   = ($canRoles ? ($data['role_id'] ?? null) : null) ?? LookupOptions::roleId(config('rotc.default_role'));
+            $roleName = strtolower((string) \App\Models\Role::find($roleId)?->role_name);
+            $trainee  = in_array($roleName, config('rotc.attendance_roles'), true);
+
             $cadet = UserInfo::create([
                 'user_id'           => (string) Str::uuid(), // replaced by the real login id on sign-up
                 'first_name'        => trim($data['first_name']),
@@ -103,9 +107,9 @@ class CadetController extends Controller
                 'platoon_id'        => $canAssign ? ($data['platoon_id'] ?? null) : null,
                 'platoon_unit_id'   => $canAssign && !empty($data['platoon_id']) ? ($data['platoon_unit_id'] ?? null) : null,
                 'specialization_id' => ($canAssign ? ($data['specialization_id'] ?? null) : null) ?? Specialization::defaultId(),
-                'role_id'           => ($canRoles ? ($data['role_id'] ?? null) : null) ?? LookupOptions::roleId(config('rotc.default_role')),
+                'role_id'           => $roleId,
                 'status'            => 'active',
-                'school_year_id'    => SchoolYear::active()?->school_year_id,
+                'school_year_id'    => $trainee ? SchoolYear::active()?->school_year_id : null, // staff aren't in a batch
             ]);
 
             $cadet->ensureQrToken();
@@ -166,6 +170,10 @@ class CadetController extends Controller
                 throw ValidationException::withMessages(['role_id' => 'You cannot change your own role.']);
             }
             $cadet->role_id = $data['role_id'];
+            $roleName       = strtolower((string) \App\Models\Role::find($data['role_id'])?->role_name);
+            $cadet->school_year_id = in_array($roleName, config('rotc.attendance_roles'), true)
+                ? ($cadet->school_year_id ?? SchoolYear::active()?->school_year_id)
+                : null;
         }
 
         $cadet->save();

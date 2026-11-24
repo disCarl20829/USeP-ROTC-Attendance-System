@@ -7,6 +7,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Upper-year Officers/Admins can join:** profiles pre-added by an admin skip the first-year
+  check and don't need a platoon/specialization at setup; staff are never tagged to a cadet
+  batch (role changes add/remove the batch). `rotc:make-admin` now creates the profile when
+  none exists (linked to an existing login, or pending until they register).
+
 ### Added
 - **Platoon numbers** (e.g. Golf 1st, Golf 2nd): `platoon_units` table, admins add/remove
   numbers per platoon in Settings (removal blocked while members are assigned). Cadets pick

@@ -564,7 +564,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
             <Modal show={isAddModalOpen} onClose={closeAddModal}>
                 <form onSubmit={handleAddCadetSubmit} className="p-6">
                     <div className="flex items-center justify-between border-b pb-3 mb-4">
-                        <h2 className="text-lg font-bold text-gray-900">Add New Cadet</h2>
+                        <h2 className="text-lg font-bold text-gray-900">Add Member</h2>
                         <button type="button" onClick={closeAddModal} className="text-gray-400 hover:text-gray-600">
                             <XMarkIcon className="h-5 w-5" />
                         </button>

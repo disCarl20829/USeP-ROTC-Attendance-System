@@ -5,7 +5,7 @@ import RegisterSteps from '@/Components/RegisterSteps';
 import StatusMessage from '@/Components/StatusMessage';
 
 /** Register step 3: technical info. Role is always Cadet. */
-export default function Setup({ email, prefill = {}, linked = false, options = {}, schoolYear = null }) {
+export default function Setup({ email, prefill = {}, linked = false, linkedRole = null, isStaff = false, options = {}, schoolYear = null }) {
     const str = (v) => (v === null || v === undefined ? '' : String(v));
 
     const { data, setData, post, processing, errors } = useForm({
@@ -47,7 +47,7 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
             <div className="mb-5">
                 <h2 className="text-lg font-bold text-gray-900">Cadet details</h2>
                 <p className="text-sm text-gray-500">
-                    Signed in as <strong>{email}</strong>. Your role will be <strong>Cadet</strong>.
+                    Signed in as <strong>{email}</strong>. Your role will be <strong>{linkedRole ?? 'Cadet'}</strong>.
                 </p>
                 {!linked && schoolYear && (
                     <p className="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
@@ -60,7 +60,13 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
                         Registration is closed (no active school year). Contact an ROTC officer.
                     </p>
                 )}
-                {linked && (
+                {isStaff && (
+                    <p className="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
+                        An admin added you as <strong>{linkedRole}</strong>. Platoon and specialization are optional for
+                        you.
+                    </p>
+                )}
+                {linked && !isStaff && (
                     <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
                         An officer already added you to the roster. Check the details below; your existing attendance
                         records will be linked to this account.
@@ -161,7 +167,7 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
                 </div>
 
                 <p className="text-xs text-gray-500">
-                    You can change your platoon and specialization later in Settings.
+                    {isStaff ? 'You can set these later in Settings.' : 'You can change your platoon and specialization later in Settings.'}
                 </p>
 
                 <div className="flex items-center justify-between pt-2">

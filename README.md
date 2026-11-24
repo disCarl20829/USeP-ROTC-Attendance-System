@@ -67,10 +67,15 @@ later in Settings (`config/rotc.php` → `self_assign_platoon`; set it to `false
 only officers/admins change them). Users without a profile are sent to `/setup`;
 unknown roles get nothing (deny by default).
 
-**First admin:** register normally, then run
-```bash
-php artisan rotc:make-admin someone@usep.edu.ph
-```
+**Officers and Admins (upper years)** can't self-register as cadets. Either:
+- an admin pre-adds them on **Cadets → Add Cadet** with role Officer/Admin; when they register
+  with that email their account links to it (no first-year check, platoon optional), or
+- from the server:
+  ```bash
+  php artisan rotc:make-admin someone@usep.edu.ph --first=Juan --last=Cruz --student-id=2022-00123
+  ```
+  This promotes an existing profile, creates one linked to an existing login, or pre-creates
+  one that links when they register.
 
 ---
 

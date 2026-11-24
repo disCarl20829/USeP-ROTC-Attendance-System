@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureProfileComplete;
 use App\Models\SchoolYear;
 use App\Models\UserInfo;
 use App\Support\Enrollment;
+use App\Support\Permissions;
 use App\Support\CurrentProfile;
 use App\Support\LookupOptions;
 use Illuminate\Http\Request;
@@ -48,6 +49,8 @@ class SetupController extends Controller
                 'specialization_id' => $existing?->specialization_id,
             ],
             'linked'   => (bool) $existing,
+            'linkedRole' => $existing?->load('role')->role?->role_name,
+            'isStaff'  => $existing ? self::isStaff($existing) : false,
             'schoolYear' => SchoolYear::active()?->toArrayForUi(),
             'options'  => LookupOptions::all(),
         ]);
@@ -73,15 +76,19 @@ class SetupController extends Controller
             $studentIdRules[] = Enrollment::rule($email);
         }
 
+        // Officers / admins (pre-added by an admin) are upperclassmen without a platoon.
+        $isStaff = $existing && self::isStaff($existing);
+        $need    = $isStaff ? 'nullable' : 'required';
+
         $data = $request->validate([
             'first_name'        => ['required', 'string', 'max:255'],
             'middle_name'       => ['nullable', 'string', 'max:255'],
             'last_name'         => ['required', 'string', 'max:255'],
             'student_id'        => $studentIdRules,
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
-            'platoon_id'        => ['required', 'integer', 'exists:platoon_list,platoon_id'],
+            'platoon_id'        => [$need, 'integer', 'exists:platoon_list,platoon_id'],
             'platoon_unit_id'   => LookupOptions::platoonUnitRules($request->integer('platoon_id') ?: null),
-            'specialization_id' => ['required', 'integer', 'exists:specialization_list,specialization_id'],
+            'specialization_id' => [$need, 'integer', 'exists:specialization_list,specialization_id'],
         ]);
 
         $cadetRoleId = LookupOptions::roleId(config('rotc.default_role'));
@@ -105,9 +112,9 @@ class SetupController extends Controller
             $profile->student_id        = trim($data['student_id']);
             $profile->campus_id         = $data['campus_id'];
             $profile->course_id         = $data['course_id'];
-            $profile->platoon_id        = $data['platoon_id'];
-            $profile->platoon_unit_id   = $data['platoon_unit_id'] ?? null;
-            $profile->specialization_id = $data['specialization_id'];
+            $profile->platoon_id        = $data['platoon_id'] ?? null;
+            $profile->platoon_unit_id   = !empty($data['platoon_id']) ? ($data['platoon_unit_id'] ?? null) : null;
+            $profile->specialization_id = $data['specialization_id'] ?? \App\Models\Specialization::defaultId();
             $profile->save();
 
             $profile->ensureQrToken();
@@ -119,6 +126,12 @@ class SetupController extends Controller
 
         return redirect()->route('dashboard')
             ->with('success', "Welcome, {$profile->first_name}! Your account and QR code are ready.");
+    }
+
+    /** Pre-added Officer / Admin (not a trainee role). */
+    private static function isStaff(UserInfo $profile): bool
+    {
+        return !in_array(Permissions::roleOf($profile->loadMissing('role')), config('rotc.attendance_roles'), true);
     }
 
     /** A hand-added profile with this email that is not yet linked to a login. */
