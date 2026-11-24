@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import StatusMessage from '@/Components/StatusMessage';
+import RotcLogo from '@/Components/RotcLogo';
 
 const icons = {
     home: 'M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75',
@@ -52,24 +53,20 @@ export default function AuthenticatedLayout({ header, children }) {
             )}
 
             <aside
-                className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-[#5C1515] transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+                className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-rotc-maroon-dark transition-transform duration-300 ease-in-out lg:translate-x-0 ${
                     sidebarOpen ? 'translate-x-0' : '-translate-x-full'
                 }`}
             >
                 <div className="flex h-full flex-col">
-                    <div className="flex h-16 items-center gap-3 border-b border-white/10 px-6">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
-                            <svg className="h-6 w-6 text-[#D4A843]" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                            </svg>
+                    <Link href={route('dashboard')} className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+                        <RotcLogo size={44} eager />
+                        <div className="leading-tight">
+                            <p className="whitespace-nowrap font-display text-xl font-semibold tracking-wide text-white">USeP ROTC Unit</p>
+                            <p className="text-xs text-rotc-gold-light">Tagum-Mabini Campus</p>
                         </div>
-                        <div>
-                            <h1 className="text-sm font-bold text-white">USeP ROTC</h1>
-                            <p className="text-xs text-gray-300">QR Attendance System</p>
-                        </div>
-                    </div>
+                    </Link>
 
-                    <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-6">
+                    <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-5">
                         {navigation.map((item) => {
                             const isActive = currentRoute === item.href;
                             return (
@@ -87,8 +84,8 @@ export default function AuthenticatedLayout({ header, children }) {
                     </nav>
 
                     <div className="border-t border-white/10 p-4">
-                        <div className="flex items-center gap-3 rounded-lg bg-white/5 p-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#D4A843] text-sm font-bold text-[#5C1515]">
+                        <div className="flex items-center gap-3 px-1 py-2">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-rotc-gold text-sm font-bold text-rotc-maroon-dark">
                                 {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
                             </div>
                             <div className="min-w-0 flex-1">
@@ -100,17 +97,17 @@ export default function AuthenticatedLayout({ header, children }) {
                             href={route('logout')}
                             method="post"
                             as="button"
-                            className="mt-3 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-300 transition-all duration-200 hover:bg-white/10 hover:text-white"
+                            className="mt-2 flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
                         >
                             <Icon name="logout" className="h-5 w-5" />
-                            Sign Out
+                            Sign out
                         </Link>
                     </div>
                 </div>
             </aside>
 
-            <div className="lg:pl-72">
-                <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md sm:px-6">
+            <div className="lg:pl-64">
+                <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-gray-200 bg-white px-4 sm:px-6">
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden"
@@ -118,8 +115,9 @@ export default function AuthenticatedLayout({ header, children }) {
                         <Icon name="bars" className="h-6 w-6" />
                     </button>
 
+                    <RotcLogo size={28} className="lg:hidden" />
                     {header && (
-                        <h1 className="text-lg font-semibold text-gray-900">{header}</h1>
+                        <h1 className="text-xl font-semibold uppercase tracking-wide text-gray-900">{header}</h1>
                     )}
                 </header>
 

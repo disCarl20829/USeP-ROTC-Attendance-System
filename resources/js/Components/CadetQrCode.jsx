@@ -24,7 +24,7 @@ export default function CadetQrCode({ value, studentId, name, size = 220 }) {
 
     return (
         <div className="flex flex-col items-center">
-            <div ref={wrapper} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div ref={wrapper} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <QRCodeCanvas value={value} size={size} level="M" marginSize={2} title={`QR code for ${name ?? 'cadet'}`} />
             </div>
             <button type="button" onClick={download} className="btn-secondary mt-4 gap-2">

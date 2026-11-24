@@ -22,7 +22,7 @@ export default function MyAttendance({ summary, points = {} }) {
                     </p>
                 </div>
                 <div className="text-right">
-                    <p className="text-2xl font-black text-gray-900">
+                    <p className="text-2xl font-bold text-gray-900">
                         {summary.points}
                         <span className="text-sm font-semibold text-gray-400"> / {summary.max_points} pts</span>
                     </p>

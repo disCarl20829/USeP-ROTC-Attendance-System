@@ -14,8 +14,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', fn () => Inertia::render('Welcome', [
-    'canLogin'    => true,
-    'canRegister' => true,
+    'videoId' => \App\Support\YouTube::videoId(\App\Models\Utility::find(1)?->welcome_video_url),
 ]))->name('home');
 
 Route::middleware('supabase.auth')->group(function () {

@@ -17,6 +17,7 @@ class Utility extends Model
         'default_start_time',
         'default_end_time',
         'default_late_time',
+        'welcome_video_url',
         'updated_by',
         'updated_at',
     ];

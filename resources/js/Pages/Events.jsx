@@ -333,7 +333,7 @@ export default function Events({ events = [], defaults = {} }) {
                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                                 <p className="text-xs text-gray-400 font-semibold uppercase">Date Scheduled</p>
                                 <p className="font-semibold text-gray-900 mt-1 flex items-center gap-1.5">
-                                    <CalendarDaysIcon className="h-4 w-4 text-indigo-600" />
+                                    <CalendarDaysIcon className="h-4 w-4 text-rotc-maroon" />
                                     {selectedEvent.date || selectedEvent.formation_date}
                                 </p>
                             </div>
@@ -341,7 +341,7 @@ export default function Events({ events = [], defaults = {} }) {
                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                                 <p className="text-xs text-gray-400 font-semibold uppercase">Location</p>
                                 <p className="font-semibold text-gray-900 mt-1 flex items-center gap-1.5">
-                                    <MapPinIcon className="h-4 w-4 text-indigo-600" />
+                                    <MapPinIcon className="h-4 w-4 text-rotc-maroon" />
                                     {selectedEvent.location || 'PECC Gym'}
                                 </p>
                             </div>
@@ -349,7 +349,7 @@ export default function Events({ events = [], defaults = {} }) {
                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                                 <p className="text-xs text-gray-400 font-semibold uppercase">Session Time Window</p>
                                 <p className="font-semibold text-gray-900 mt-1 flex items-center gap-1.5 font-mono">
-                                    <ClockIcon className="h-4 w-4 text-indigo-600" />
+                                    <ClockIcon className="h-4 w-4 text-rotc-maroon" />
                                     {selectedEvent.time || `${selectedEvent.start_time || '06:30'} - ${selectedEvent.end_time || '12:00'}`}
                                 </p>
                             </div>

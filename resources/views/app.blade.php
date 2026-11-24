@@ -4,11 +4,16 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>USeP ROTC Attendance</title>
+        <meta name="description" content="QR attendance system of the USeP ROTC Unit, Tagum-Mabini Campus.">
+        <meta name="theme-color" content="#5C1515">
+
+        <link rel="icon" type="image/png" href="/favicon.png">
+        <link rel="apple-touch-icon" href="/images/rotc-logo-192.png">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=public-sans:400,500,600,700|barlow-condensed:500,600,700&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
         @routes

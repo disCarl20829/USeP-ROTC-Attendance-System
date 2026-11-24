@@ -290,11 +290,11 @@ export default function QRScanner({ points = {} }) {
 
                         {isCameraActive && (
                             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                                <div className="relative h-[220px] w-[220px] rounded-lg border-2 border-indigo-400/50">
-                                    <div className="absolute -left-1 -top-1 h-5 w-5 border-l-4 border-t-4 border-indigo-500" />
-                                    <div className="absolute -right-1 -top-1 h-5 w-5 border-r-4 border-t-4 border-indigo-500" />
-                                    <div className="absolute -bottom-1 -left-1 h-5 w-5 border-b-4 border-l-4 border-indigo-500" />
-                                    <div className="absolute -bottom-1 -right-1 h-5 w-5 border-b-4 border-r-4 border-indigo-500" />
+                                <div className="relative h-[220px] w-[220px] rounded-lg border-2 border-rotc-gold/60">
+                                    <div className="absolute -left-1 -top-1 h-5 w-5 border-l-4 border-t-4 border-rotc-maroon" />
+                                    <div className="absolute -right-1 -top-1 h-5 w-5 border-r-4 border-t-4 border-rotc-maroon" />
+                                    <div className="absolute -bottom-1 -left-1 h-5 w-5 border-b-4 border-l-4 border-rotc-maroon" />
+                                    <div className="absolute -bottom-1 -right-1 h-5 w-5 border-b-4 border-r-4 border-rotc-maroon" />
                                 </div>
                             </div>
                         )}
@@ -306,7 +306,7 @@ export default function QRScanner({ points = {} }) {
                                 <button
                                     type="button"
                                     onClick={startCamera}
-                                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-medium text-white shadow hover:bg-indigo-700 active:scale-95 transition"
+                                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-rotc-maroon px-4 py-2.5 text-xs font-medium text-white shadow hover:bg-rotc-maroon-dark active:scale-95 transition"
                                 >
                                     <CameraIcon className="h-4 w-4" /> Start Camera
                                 </button>
@@ -330,7 +330,7 @@ export default function QRScanner({ points = {} }) {
                             </p>
                         ) : (
                             <select
-                                className="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className="input-field"
                                 value={selectedSessionId}
                                 onChange={(e) => {
                                     setSelectedSessionId(e.target.value);
@@ -353,8 +353,8 @@ export default function QRScanner({ points = {} }) {
                         <div className="flex gap-2">
                             <input
                                 type="text"
-                                className="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 font-mono text-sm"
-                                placeholder="e.g. 2023-00123"
+                                className="input-field font-mono"
+                                placeholder="e.g. 2026-00123"
                                 value={studentIdNumber}
                                 onChange={(e) => setStudentIdNumber(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && processScanSubmission(studentIdNumber)}
@@ -363,7 +363,7 @@ export default function QRScanner({ points = {} }) {
                                 type="button"
                                 onClick={() => processScanSubmission(studentIdNumber)}
                                 disabled={scanning || !studentIdNumber.trim() || !selectedSessionId}
-                                className="px-4 py-2 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                                className="btn-primary px-4"
                             >
                                 Submit
                             </button>
@@ -427,7 +427,7 @@ export default function QRScanner({ points = {} }) {
 
             {modalConfig.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
-                    <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl border border-gray-100 text-center relative">
+                    <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl border border-gray-100 text-center relative">
                         <button 
                             onClick={closeModal}
                             className="absolute top-3 right-3 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100"

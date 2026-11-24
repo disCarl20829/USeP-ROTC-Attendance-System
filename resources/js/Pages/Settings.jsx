@@ -21,6 +21,7 @@ export default function Settings({ profile = {}, utility = {}, options = {}, can
         default_start_time: utility.default_start_time ?? '08:00',
         default_end_time: utility.default_end_time ?? '17:00',
         default_late_time: utility.default_late_time ?? '08:15',
+        welcome_video_url: utility.welcome_video_url ?? '',
     });
 
     const pd = profileForm.data;
@@ -159,8 +160,8 @@ export default function Settings({ profile = {}, utility = {}, options = {}, can
 
                 {can.system && (
                     <div className="card p-6">
-                        <h2 className="text-lg font-semibold text-gray-900">Default session times</h2>
-                        <p className="mb-5 text-sm text-gray-500">Used as defaults when creating events (admin only).</p>
+                        <h2 className="text-lg font-semibold text-gray-900">System settings</h2>
+                        <p className="mb-5 text-sm text-gray-500">Default session times for new events, and the home page video (admin only).</p>
 
                         <form onSubmit={saveSystem} className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -181,9 +182,24 @@ export default function Settings({ profile = {}, utility = {}, options = {}, can
                                     </FormField>
                                 ))}
                             </div>
+                            <FormField
+                                id="welcome_video_url"
+                                label="Welcome page video (YouTube link)"
+                                error={systemForm.errors.welcome_video_url}
+                                hint="Shown in the Video guide section of the home page. Leave empty to show a placeholder."
+                            >
+                                <input
+                                    id="welcome_video_url"
+                                    type="url"
+                                    value={systemForm.data.welcome_video_url}
+                                    onChange={(e) => systemForm.setData('welcome_video_url', e.target.value)}
+                                    className="input-field"
+                                    placeholder="https://www.youtube.com/watch?v=…"
+                                />
+                            </FormField>
                             <div className="flex justify-end">
                                 <button type="submit" disabled={systemForm.processing} className="btn-primary">
-                                    {systemForm.processing ? 'Saving…' : 'Save defaults'}
+                                    {systemForm.processing ? 'Saving…' : 'Save settings'}
                                 </button>
                             </div>
                         </form>

@@ -88,6 +88,10 @@ class SettingsController extends Controller
             'default_start_time' => ['required', 'date_format:H:i'],
             'default_end_time'   => ['required', 'date_format:H:i', 'after:default_start_time'],
             'default_late_time'  => ['required', 'date_format:H:i', 'after_or_equal:default_start_time', 'before_or_equal:default_end_time'],
+            'welcome_video_url'  => [
+                'nullable', 'string', 'max:500',
+                fn ($a, $v, $fail) => $v && !\App\Support\YouTube::videoId($v) ? $fail('Paste a YouTube link, e.g. https://www.youtube.com/watch?v=…') : null,
+            ],
         ]);
 
         $utility = Utility::firstOrNew(['id' => 1]);
@@ -108,6 +112,7 @@ class SettingsController extends Controller
             'default_start_time' => substr((string) ($u->default_start_time ?? '08:00'), 0, 5),
             'default_end_time'   => substr((string) ($u->default_end_time ?? '17:00'), 0, 5),
             'default_late_time'  => substr((string) ($u->default_late_time ?? '08:15'), 0, 5),
+            'welcome_video_url'  => (string) ($u->welcome_video_url ?? ''),
         ];
     }
 }

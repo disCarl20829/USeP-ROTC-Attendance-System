@@ -49,10 +49,10 @@ export default function Reports({
 
     const getCellColorClass = (val) => {
         if (val === '' || val === null || val === undefined) return 'bg-gray-50 text-gray-300 border border-gray-200';
-        if (val == points.present) return 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 shadow-2xs';
-        if (val == points.late) return 'bg-amber-100 text-amber-800 font-bold border border-amber-200 shadow-2xs';
-        if (val == points.excused) return 'bg-sky-100 text-sky-800 font-bold border border-sky-200 shadow-2xs';
-        if (val === 'A') return 'bg-rose-100 text-rose-800 font-bold border border-rose-200 shadow-2xs';
+        if (val == points.present) return 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-200';
+        if (val == points.late) return 'bg-amber-100 text-amber-800 font-bold border border-amber-200';
+        if (val == points.excused) return 'bg-sky-100 text-sky-800 font-bold border border-sky-200';
+        if (val === 'A') return 'bg-rose-100 text-rose-800 font-bold border border-rose-200';
         return 'bg-gray-50 text-gray-300 border border-gray-200';
     };
 
@@ -85,83 +85,78 @@ export default function Reports({
 
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Modern Header Section */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-2xl shadow-xs border border-gray-100">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white p-6 rounded-xl shadow-xs border border-gray-100">
                     <div>
-                        <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-1 rounded-md bg-[#7B1E1E]/10 text-[#7B1E1E] text-xs font-bold uppercase tracking-wider">
-                                USeP Tagum Unit
-                            </span>
-                            <span className="text-xs text-gray-400 font-semibold">• Official Roster</span>
-                        </div>
-                        <h2 className="text-2xl font-black text-gray-900 tracking-tight mt-1">LE 1: Attendance Matrix (30%)</h2>
-                        <p className="text-xs text-gray-500 font-medium">Synchronized color-coded attendance log matching institutional standards.</p>
+                        <p className="eyebrow">Tagum-Mabini Campus</p>
+                        <h2 className="mt-1 text-3xl font-semibold uppercase text-gray-900">LE 1: Attendance (30%)</h2>
+                        <p className="text-sm text-gray-500">Points per session. Download the Excel sheet for the full roster by platoon.</p>
                     </div>
                     <div>
                         <button 
                             onClick={handleExport} 
-                            className="flex items-center gap-2 bg-[#7B1E1E] px-5 py-2.5 text-xs font-bold text-white rounded-xl shadow-md hover:bg-[#5C1515] active:scale-95 transition-all"
+                            className="btn-primary"
                         >
                             <ArrowDownTrayIcon className="h-4 w-4" />
-                            Export Excel Workbook
+                            Download Excel sheet
                         </button>
                     </div>
                 </div>
 
-                {/* Professional Metric Cards */}
+                {/* Metrics */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="p-5 bg-white shadow-xs rounded-2xl border border-gray-100 flex items-center gap-4">
+                    <div className="p-5 bg-white shadow-xs rounded-xl border border-gray-100 flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                             <AcademicCapIcon className="h-6 w-6" />
                         </div>
                         <div>
                             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Total Enrolled</p>
-                            <p className="text-2xl font-black text-gray-900">{metrics.totalEnrolled || cadetAttendanceList.length}</p>
+                            <p className="text-2xl font-bold text-gray-900">{metrics.totalEnrolled || cadetAttendanceList.length}</p>
                         </div>
                     </div>
 
-                    <div className="p-5 bg-white shadow-xs rounded-2xl border border-gray-100 flex items-center gap-4">
+                    <div className="p-5 bg-white shadow-xs rounded-xl border border-gray-100 flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                             <UsersIcon className="h-6 w-6" />
                         </div>
                         <div>
                             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Active Cadets</p>
-                            <p className="text-2xl font-black text-gray-900">{metrics.activeCadets}</p>
+                            <p className="text-2xl font-bold text-gray-900">{metrics.activeCadets}</p>
                         </div>
                     </div>
 
-                    <div className="p-5 bg-rose-50/50 shadow-xs rounded-2xl border border-rose-100 flex items-center gap-4">
+                    <div className="p-5 bg-rose-50/50 shadow-xs rounded-xl border border-rose-100 flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
                             <ExclamationTriangleIcon className="h-6 w-6" />
                         </div>
                         <div>
                             <p className="text-xs text-rose-700 font-bold uppercase tracking-wider">3+ Absences (Risk)</p>
-                            <p className="text-2xl font-black text-rose-700">{criticalAbsences}</p>
+                            <p className="text-2xl font-bold text-rose-700">{criticalAbsences}</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Main Table Card */}
-                <div className="bg-white shadow-xs rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="bg-white shadow-xs rounded-xl border border-gray-200 overflow-hidden">
                     <div className="p-5 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-gray-50/30">
                         <div className="flex flex-wrap items-center gap-6">
                             <div>
-                                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wide">Roster Grid</h3>
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Roster Grid</h3>
                                 <p className="text-xs text-gray-500 font-medium">Male &amp; Female Cadet Records</p>
                             </div>
                             
                             {/* Modern Status Legend */}
                             <div className="flex items-center gap-4 text-xs sm:border-l sm:pl-5 border-gray-200">
                                 <span className="flex items-center gap-1.5 font-semibold text-gray-700">
-                                    <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-2xs"></span> {points.present} (Present)
+                                    <span className="w-3 h-3 rounded-full bg-emerald-500"></span> {points.present} (Present)
                                 </span>
                                 <span className="flex items-center gap-1.5 font-semibold text-gray-700">
-                                    <span className="w-3 h-3 rounded-full bg-amber-400 shadow-2xs"></span> {points.late} (Late)
+                                    <span className="w-3 h-3 rounded-full bg-amber-400"></span> {points.late} (Late)
                                 </span>
                                 <span className="flex items-center gap-1.5 font-semibold text-gray-700">
-                                    <span className="w-3 h-3 rounded-full bg-sky-500 shadow-2xs"></span> {points.excused} (Excused)
+                                    <span className="w-3 h-3 rounded-full bg-sky-500"></span> {points.excused} (Excused)
                                 </span>
                                 <span className="flex items-center gap-1.5 font-semibold text-gray-700">
-                                    <span className="w-3 h-3 rounded-full bg-rose-500 shadow-2xs"></span> A (Absent, {points.absent})
+                                    <span className="w-3 h-3 rounded-full bg-rose-500"></span> A (Absent, {points.absent})
                                 </span>
                             </div>
                         </div>
@@ -186,7 +181,7 @@ export default function Reports({
                                 <input
                                     type="text"
                                     placeholder="Search name or ID..."
-                                    className="pl-10 pr-4 py-2 text-xs rounded-xl border-gray-200 bg-white shadow-2xs focus:border-[#7B1E1E] focus:ring-[#7B1E1E] w-60 font-medium placeholder-gray-400"
+                                    className="pl-10 pr-4 py-2 text-xs rounded-xl border-gray-200 bg-white focus:border-[#7B1E1E] focus:ring-[#7B1E1E] w-60 font-medium placeholder-gray-400"
                                     value={searchQuery}
                                     onChange={(e) => {
                                         setSearchQuery(e.target.value);
@@ -201,9 +196,9 @@ export default function Reports({
                         <table className="w-full text-left text-xs border-collapse font-sans">
                             <thead>
                                 <tr className="bg-slate-900 text-white text-center font-bold">
-                                    <th colSpan="2" className="py-3 px-3 border-r border-slate-700 text-left font-black text-xs tracking-wider uppercase pl-4">USeP Tagum Unit</th>
-                                    <th colSpan={activeSessions.length} className="py-3 px-3 border-r border-slate-700 text-center font-black text-xs tracking-wider uppercase">LE 1: Attendance (30%)</th>
-                                    <th className="py-3 px-3 bg-slate-800 text-white font-black text-xs tracking-wider uppercase">Total</th>
+                                    <th colSpan="2" className="py-3 px-3 border-r border-slate-700 text-left font-bold text-xs tracking-wider pl-4">USeP Tagum Unit</th>
+                                    <th colSpan={activeSessions.length} className="py-3 px-3 border-r border-slate-700 text-center font-bold text-xs tracking-wider uppercase">LE 1: Attendance (30%)</th>
+                                    <th className="py-3 px-3 bg-slate-800 text-white font-bold text-xs tracking-wider uppercase">Total</th>
                                 </tr>
                                 <tr className="bg-slate-800 text-slate-200 border-b border-slate-700 text-center font-bold text-[11px]">
                                     <td colSpan="2" className="py-2 px-3 border-r border-slate-700 text-left font-bold pl-4">MALE &amp; FEMALE</td>
@@ -222,7 +217,7 @@ export default function Reports({
                                             {formatDateHeader(session, idx)}
                                         </th>
                                     ))}
-                                    <th className="py-2.5 px-3 text-center w-14 font-black bg-gray-200 text-gray-900">Pts</th>
+                                    <th className="py-2.5 px-3 text-center w-14 font-bold bg-gray-200 text-gray-900">Pts</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 font-sans">
@@ -258,7 +253,7 @@ export default function Reports({
                                                         </td>
                                                     );
                                                 })}
-                                                <td className="py-3 px-3 text-center font-mono font-black text-gray-900 bg-gray-50 border-l border-gray-200">
+                                                <td className="py-3 px-3 text-center font-mono font-bold text-gray-900 bg-gray-50 border-l border-gray-200">
                                                     {cadet.attendance_points ?? 0}
                                                 </td>
                                             </tr>
@@ -279,7 +274,7 @@ export default function Reports({
                                     setPageSize(Number(e.target.value));
                                     setCurrentPage(1);
                                 }}
-                                className="text-xs py-1.5 px-3 rounded-xl border-gray-200 bg-gray-50 font-bold shadow-2xs focus:ring-[#7B1E1E]"
+                                className="text-xs py-1.5 px-3 rounded-xl border-gray-200 bg-gray-50 font-bold focus:ring-[#7B1E1E]"
                             >
                                 <option value={15}>l5</option>
                                 <option value={25}>25</option>
@@ -296,7 +291,7 @@ export default function Reports({
                             <button
                                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                 disabled={currentPage === 1}
-                                className="p-2 rounded-xl border border-gray-200 bg-white disabled:opacity-30 hover:bg-gray-50 transition-all shadow-2xs"
+                                className="p-2 rounded-xl border border-gray-200 bg-white disabled:opacity-30 hover:bg-gray-50 transition-all"
                             >
                                 <ChevronLeftIcon className="h-4 w-4 text-gray-600" />
                             </button>
@@ -306,7 +301,7 @@ export default function Reports({
                             <button
                                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                 disabled={currentPage === totalPages}
-                                className="p-2 rounded-xl border border-gray-200 bg-white disabled:opacity-30 hover:bg-gray-50 transition-all shadow-2xs"
+                                className="p-2 rounded-xl border border-gray-200 bg-white disabled:opacity-30 hover:bg-gray-50 transition-all"
                             >
                                 <ChevronRightIcon className="h-4 w-4 text-gray-600" />
                             </button>

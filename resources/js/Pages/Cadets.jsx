@@ -480,7 +480,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                                                     {/* Edit Button */}
                                                     <button
                                                         onClick={() => openEditModal(cadet)}
-                                                        className="rounded-lg p-1.5 text-indigo-600 hover:bg-indigo-50 flex items-center gap-1 text-xs font-medium transition"
+                                                        className="rounded-lg p-1.5 text-rotc-maroon hover:bg-rotc-maroon/5 flex items-center gap-1 text-xs font-medium transition"
                                                         title="Edit Cadet"
                                                     >
                                                         <PencilSquareIcon className="h-4 w-4" />
@@ -638,7 +638,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="add_course_id" value="Course" />
                             <select
                                 id="add_course_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={addForm.data.course_id}
                                 onChange={(e) => addForm.setData('course_id', e.target.value)}
                             >
@@ -656,7 +656,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="add_campus_id" value="Campus" />
                             <select
                                 id="add_campus_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={addForm.data.campus_id}
                                 onChange={(e) => addForm.setData('campus_id', e.target.value)}
                             >
@@ -674,7 +674,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="add_platoon_id" value="Platoon" />
                             <select
                                 id="add_platoon_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={addForm.data.platoon_id}
                                 onChange={(e) => addForm.setData('platoon_id', e.target.value)}
                                 disabled={!can.assign}
@@ -692,7 +692,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="add_specialization_id" value="Specialization" />
                             <select
                                 id="add_specialization_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={addForm.data.specialization_id}
                                 onChange={(e) => addForm.setData('specialization_id', e.target.value)}
                                 disabled={!can.assign}
@@ -712,7 +712,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="add_role_id" value="Role" />
                             <select
                                 id="add_role_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={addForm.data.role_id}
                                 onChange={(e) => addForm.setData('role_id', e.target.value)}
                             >
@@ -814,7 +814,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="edit_status" value="Enrollment Status" />
                             <select
                                 id="edit_status"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon"
                                 value={editForm.data.status}
                                 onChange={(e) => editForm.setData('status', e.target.value)}
                             >
@@ -828,7 +828,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="edit_course_id" value="Course" />
                             <select
                                 id="edit_course_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={editForm.data.course_id}
                                 onChange={(e) => editForm.setData('course_id', e.target.value)}
                             >
@@ -846,7 +846,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="edit_campus_id" value="Campus" />
                             <select
                                 id="edit_campus_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={editForm.data.campus_id}
                                 onChange={(e) => editForm.setData('campus_id', e.target.value)}
                             >
@@ -864,7 +864,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="edit_platoon_id" value="Platoon" />
                             <select
                                 id="edit_platoon_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={editForm.data.platoon_id}
                                 onChange={(e) => editForm.setData('platoon_id', e.target.value)}
                                 disabled={!can.assign}
@@ -882,7 +882,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="edit_specialization_id" value="Specialization" />
                             <select
                                 id="edit_specialization_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={editForm.data.specialization_id}
                                 onChange={(e) => editForm.setData('specialization_id', e.target.value)}
                                 disabled={!can.assign}
@@ -901,7 +901,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             <InputLabel htmlFor="edit_role_id" value="Role" />
                             <select
                                 id="edit_role_id"
-                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={editForm.data.role_id}
                                 onChange={(e) => editForm.setData('role_id', e.target.value)}
                             >

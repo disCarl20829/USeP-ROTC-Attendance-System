@@ -133,7 +133,7 @@ export default function Attendance({ sessions = [], cadets = [], records = [], p
                         <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                         <input
                             type="text"
-                            className="w-full sm:w-56 rounded-lg border-gray-300 pl-9 pr-3 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            className="w-full sm:w-56 rounded-lg border-gray-300 pl-9 pr-3 text-xs shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon"
                             placeholder="Search cadet or ID..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -142,7 +142,7 @@ export default function Attendance({ sessions = [], cadets = [], records = [], p
 
                     {/* Status Filter */}
                     <select
-                        className="w-full sm:w-auto rounded-lg border-gray-300 text-xs font-medium shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        className="w-full sm:w-auto rounded-lg border-gray-300 text-xs font-medium shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                     >
@@ -152,12 +152,12 @@ export default function Attendance({ sessions = [], cadets = [], records = [], p
                         <option value="excused">Excused Only</option>
                         <option value="absent">Absent Only</option>
                         <option value="pending">Not scanned yet</option>
-                        <option value="at_risk">⚠️ 3+ Absences (At Risk)</option>
+                        <option value="at_risk">3+ Absences (At Risk)</option>
                     </select>
 
                     {/* Session Selector */}
                     <select
-                        className="w-full sm:w-auto rounded-lg border-gray-300 text-xs font-semibold shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-gray-800"
+                        className="w-full sm:w-auto rounded-lg border-gray-300 text-xs font-semibold shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon text-gray-800"
                         value={selectedSessionId}
                         onChange={(e) => setSelectedSessionId(e.target.value)}
                     >
