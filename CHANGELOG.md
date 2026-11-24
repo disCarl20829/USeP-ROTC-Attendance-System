@@ -7,6 +7,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+- **Cadet sign-up is limited to first years of the active school year:** student ID must
+  be `YYYY-NNNNN` with the year's enrollment year, and must match the number in the USeP
+  email. Cadets can't change their own ID to bypass this.
+
+### Added
+- **School years** (Settings → School year, admin): edit dates / enrollment year, close a
+  year (backup download + typed confirmation), start the next year, restore within 30 days.
+- **Archive instead of delete:** single and bulk archive on the Cadets page (bulk needs
+  `ARCHIVE <n>`), Archived list with Restore. Archived users are logged out and can't be scanned.
+- Daily `purge_archived_records()` job: deletes archives after 30 days, login accounts
+  one year after archiving.
+- **Activity log** (`audit_logs`) for backups, archives, restores and purges.
+
 ### Added
 - Branded maroon & gold Supabase email templates (code + button) in `docs/email-templates/`.
 

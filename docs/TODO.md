@@ -32,6 +32,9 @@ Legend: `P0` = needed before real use · `P1` = next up · `P2` = important · `
 
 ## P1 — Next up
 
+- [ ] **Roster upload** (waiting for the sample .xlsx): only listed enrollees can register
+- [ ] Confirm USeP's academic year end date (currently Aug 1 – May 31, editable in Settings)
+
 - [ ] "ODDRM" special-event column on the sheet (on hold)
 - [ ] Optional: custom email templates with a 6-digit code (the code input already works)
 - [ ] Change status from the Attendance roster (currently only from the scanner prompt)

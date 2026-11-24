@@ -74,6 +74,22 @@ php artisan rotc:make-admin someone@usep.edu.ph
 
 ---
 
+### School years & who can sign up
+
+- Only **first years of the active school year** can register as cadets: the student ID
+  must be `YYYY-NNNNN` with `YYYY` = the year's **enrollment year** (e.g. `2026-00107`),
+  and the number must match the USeP email (`caupepito00107@usep.edu.ph`).
+- Admins manage school years in **Settings → School year** (default August–May).
+- **Close school year**: download the backup (Excel), type `ARCHIVE <year>`. Its cadets,
+  aspirants, events and attendance are **archived**: hidden, not scannable, can't log in.
+  Officers and admins are never archived.
+- Archived data can be **restored for 30 days**; then a daily job deletes it. Login
+  accounts are deleted **one year** after archiving.
+- Admins can also archive single cadets or **bulk-archive** (typed confirmation) from the
+  Cadets page. Every archive / restore / purge is in the **activity log**.
+
+---
+
 ## 7. Quick start
 
 ### Requirements
