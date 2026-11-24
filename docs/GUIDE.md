@@ -150,18 +150,26 @@ Laravel migrations in `database/migrations/` mirror it.
 | --- | --- | --- |
 | `campus_list` | `campus_id` | |
 | `course_list` | `course_id` | |
-| `platoon_list` | `platoon_id` | |
+| `platoon_list` | `platoon_id` | letter platoons (Alpha, Golf, …) |
+| `platoon_units` | `unit_id` | numbered platoons per platoon: unique `(platoon_id, number)`, 1–20 (Golf 1st, Golf 2nd…) |
 | `role_list` | `role_id` | organizational rank, not auth role |
 | `permission_list` | `permission_id` | |
 | `role_permissions` | `(role_id, permission_id)` | composite |
-| `user_info` | `info_id` | `user_id` UUID (FK dropped); `student_id` (unique), `status` (active/dropped), `specialization_id`, `platoon_id` (optional) |
-| `formations_event` | `formation_id` | |
+| `user_info` | `info_id` | `user_id` UUID (FK dropped); `student_id` (unique), `middle_name`, `status` (active/dropped), `dropped_at`, `active_since`, `specialization_id`, `platoon_id` + `platoon_unit_id` (optional), `school_year_id` (cadets/aspirants only), `archived_at` |
+| `school_years` | `school_year_id` | `name`, `enrollment_year` (first-year ID prefix), `starts_on`/`ends_on`, `status` active/archived/purged; only one active |
+| `audit_logs` | `audit_id` | who did what: backups, archives, restores, purges, platoon numbers |
+| `login_deletions` | `user_id` | logins scheduled for deletion (1 year after archiving) |
+| `formations_event` | `formation_id` | `location`, `school_year_id`, `archived_at` |
 | `formation_sessions` | `session_id` | unique `(formation_id, session_type)` |
 | `attendance_qr` | `qr_id` | one private `qr_token` per cadet; this is what the QR encodes |
 | `attendance_records` | `record_id` | unique `(user_id, session_id)`; status present/late/excused/absent |
 | `specialization_list` | `specialization_id` | includes "Unspecified" |
-| `utilities` | `id` (always `1`) | default times |
+| `utilities` | `id` (always `1`) | default times, `welcome_video_url` |
 | `sessions` | `id` | Laravel session store (added by migration) |
+
+> **Archived rows are hidden by global scopes** on `UserInfo`, `FormationEvent`,
+> `FormationSession` and `AttendanceRecord`. Use `UserInfo::withArchived()` (or
+> `withoutGlobalScope('notArchived')`) when you really need them.
 
 > **Important:** Eloquent defaults to a primary key named `id`. Every model with a
 > custom PK must declare `protected $primaryKey = '...';`. Otherwise `find()` and
@@ -187,6 +195,9 @@ Run `php artisan route:list --except-vendor` for the full list. Summary:
 | `/cadets` (GET/POST/PUT/DELETE) | `cadets.manage` (+ `cadets.assign`, `roles.assign`, `cadets.delete` for those fields/actions) |
 | `/events` (GET/POST/PUT/DELETE) | `events.manage` |
 | `/reports`, `/reports/export-excel` | `reports.view` |
+| `POST /cadets/archive`, `POST /cadets/{id}/restore`, `DELETE /cadets/{id}` (= archive) | `cadets.delete` (Admin) |
+| `/settings/school-year/*` (start, edit, backup, close, restore) | `school_year.manage` (Admin) |
+| `POST /settings/platoons/{platoon}/units`, `DELETE /settings/platoon-units/{unit}` | `platoons.manage` (Admin) |
 
 ### Scan API
 
@@ -204,11 +215,57 @@ POST /api/attendance/scan
 
 ## 6. Automatic absences
 
-`public.mark_absent_cadets()` inserts an `absent` record for every **active Cadet**
-with no record for a session whose end time (Asia/Manila) has passed. Cadets added
+`public.mark_absent_cadets()` inserts an `absent` record for every **active, non-archived
+Cadet or Aspirant** with no record for a session whose end time (Asia/Manila) has passed. Cadets added
 after a session ended are skipped. `pg_cron` runs it every 5 minutes
 (job `mark-absent-cadets`); `php artisan rotc:mark-absent` runs it on demand. A scanner
 can still change an automatic absence to present/late/excused.
+
+### All scheduled database jobs (pg_cron on master-db)
+
+| Job | When (Manila) | Function | What it does |
+| --- | --- | --- | --- |
+| `mark-absent-cadets` | every 5 min | `mark_absent_cadets()` | absent for ended sessions without a scan |
+| `purge-archived-records` | daily 03:17 | `purge_archived_records()` | deletes archives older than 30 days; logins 1 year after archiving |
+| `ensure-school-year` | daily 00:05 | `ensure_school_year()` | starts the next school year on its start date when none is active |
+
+---
+
+## 6a. Who can sign up
+
+- **Cadets (self sign-up):** student ID `YYYY-NNNNN` where `YYYY` is the active school
+  year's `enrollment_year`, and the number must match the USeP email
+  (`caupepito00107@usep.edu.ph` ↔ `xxxx-00107`). See `App\Support\Enrollment`.
+- **Officers / Admins (upper years):** an admin pre-adds them on Cadets → Add Cadet with
+  that role (or `rotc:make-admin`). When they register with that email the account is
+  linked to the profile: no first-year check, platoon/specialization optional, and they
+  are not tagged to a school year (never archived with a batch).
+- `php artisan rotc:make-admin <email> [--first= --last= --student-id=]` promotes an
+  existing profile, creates one linked to an existing login, or pre-creates one.
+
+## 6b. School years and archiving
+
+- Admin: **Settings → School year**. Closing a year requires downloading the backup
+  (.xlsx: attendance sheets + Profiles / Events / Records) within 15 minutes and typing
+  `ARCHIVE <name>`. It archives that year's cadets/aspirants, events and attendance.
+- Restore within 30 days (only when no other year is active). After 30 days the daily
+  job deletes the data; login accounts are deleted 1 year after archiving.
+- Single / bulk archive on the Cadets page (bulk needs `ARCHIVE <count>`); archived users
+  are logged out and can't be scanned.
+- The next year starts automatically; admins see a banner 2 weeks before the end date.
+
+## 6c. Platoon numbers
+
+Admins manage numbers per platoon in **Settings → Platoon numbers** (add the next free
+number; remove only when nobody is assigned). Sign-up, Settings and Cadets show a number
+picker filtered by the chosen platoon; it is required when that platoon has numbers.
+Labels read "Golf 1st" everywhere and the Excel export has one sheet per numbered platoon.
+
+## 6d. Welcome page video
+
+Admins paste a YouTube link in **Settings → System settings → Welcome page video**
+(`utilities.welcome_video_url`). `App\Support\YouTube::videoId()` accepts watch,
+`youtu.be`, Shorts, live and embed links; the page embeds it via youtube-nocookie.com.
 
 ---
 

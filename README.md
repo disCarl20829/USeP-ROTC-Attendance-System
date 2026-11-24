@@ -79,6 +79,14 @@ unknown roles get nothing (deny by default).
 
 ---
 
+### Platoon numbers & home page video
+
+- Platoons have numbers per platoon (e.g. **Golf 1st, Golf 2nd**). Admins add/remove them in
+  **Settings → Platoon numbers**; cadets choose platoon + number at sign-up. The Excel export
+  has one sheet per numbered platoon plus "All".
+- The home page has a **Video guide** section: paste a YouTube link in
+  **Settings → System settings → Welcome page video**.
+
 ### School years & who can sign up
 
 - Only **first years of the active school year** can register as cadets: the student ID
