@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Campus;
 use App\Models\Course;
 use App\Models\Platoon;
+use App\Models\PlatoonUnit;
 use App\Models\Role;
 use App\Models\Specialization;
 
@@ -22,6 +23,13 @@ class LookupOptions
                     'campus_id'   => $c->campus_name, // column holds the campus id
                 ]),
             'platoons'        => Platoon::orderBy('platoon_name')->get(['platoon_id', 'platoon_name']),
+            'platoonUnits'    => PlatoonUnit::orderBy('platoon_id')->orderBy('number')->get(['unit_id', 'platoon_id', 'number'])
+                ->map(fn ($u) => [
+                    'unit_id'    => $u->unit_id,
+                    'platoon_id' => $u->platoon_id,
+                    'number'     => $u->number,
+                    'label'      => PlatoonUnit::ordinal($u->number),
+                ]),
             'specializations' => Specialization::orderBy('specialization_name')->get(['specialization_id', 'specialization_name']),
             'roles'           => Role::orderBy('role_id')->get(['role_id', 'role_name']),
         ];
@@ -54,6 +62,25 @@ class LookupOptions
                 $existing = \App\Models\UserInfo::findByStudentId((string) $value);
                 if ($existing && $existing->info_id !== $ignoreInfoId) {
                     $fail('That student ID is already registered.');
+                }
+            },
+        ];
+    }
+
+    /**
+     * platoon_unit_id rules: must belong to the chosen platoon; required when that
+     * platoon has numbers set up. $required = false allows leaving both empty.
+     */
+    public static function platoonUnitRules(?int $platoonId, bool $required = true): array
+    {
+        $hasUnits = $platoonId && PlatoonUnit::where('platoon_id', $platoonId)->exists();
+
+        return [
+            ($required && $hasUnits) ? 'required' : 'nullable',
+            'integer',
+            function ($attribute, $value, $fail) use ($platoonId) {
+                if ($value && !PlatoonUnit::where('unit_id', $value)->where('platoon_id', $platoonId)->exists()) {
+                    $fail('Choose a platoon number that belongs to the selected platoon.');
                 }
             },
         ];

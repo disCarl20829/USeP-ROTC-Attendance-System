@@ -21,6 +21,9 @@ class SettingsController extends Controller
             'profile' => $profile->toProfileArray(),
             'utility' => $this->utility(),
             'options' => LookupOptions::all(),
+            'platoonAdmin' => Permissions::allows($profile, 'platoons.manage')
+                ? PlatoonUnitController::settingsProps()
+                : null,
             'schoolYears' => Permissions::allows($profile, 'school_year.manage')
                 ? SchoolYearController::settingsProps($request)
                 : null,
@@ -58,6 +61,7 @@ class SettingsController extends Controller
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
             ...($canAssign ? [
                 'platoon_id'        => ['nullable', 'integer', 'exists:platoon_list,platoon_id'],
+                'platoon_unit_id'   => LookupOptions::platoonUnitRules($request->integer('platoon_id') ?: null),
                 'specialization_id' => ['nullable', 'integer', 'exists:specialization_list,specialization_id'],
             ] : []),
         ]);
@@ -73,6 +77,7 @@ class SettingsController extends Controller
 
         if ($canAssign) {
             $profile->platoon_id        = $data['platoon_id'] ?? null;
+            $profile->platoon_unit_id   = !empty($data['platoon_id']) ? ($data['platoon_unit_id'] ?? null) : null;
             $profile->specialization_id = $data['specialization_id'] ?? Specialization::defaultId();
         }
 

@@ -7,6 +7,7 @@ use App\Http\Controllers\CadetController;
 use App\Http\Controllers\CadetPortalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\PlatoonUnitController;
 use App\Http\Controllers\SchoolYearController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SetupController;
@@ -31,6 +32,12 @@ Route::middleware('supabase.auth')->group(function () {
         Route::put('/settings/profile', [SettingsController::class, 'updateProfile'])->name('settings.profile');
         Route::put('/settings/system', [SettingsController::class, 'updateSystem'])
             ->middleware('permission:settings.system')->name('settings.system');
+
+        // Platoon numbers (admin)
+        Route::middleware('permission:platoons.manage')->group(function () {
+            Route::post('/settings/platoons/{platoonId}/units', [PlatoonUnitController::class, 'store'])->whereNumber('platoonId')->name('platoon-units.store');
+            Route::delete('/settings/platoon-units/{unitId}', [PlatoonUnitController::class, 'destroy'])->whereNumber('unitId')->name('platoon-units.destroy');
+        });
 
         // School years (admin)
         Route::middleware('permission:school_year.manage')->prefix('settings/school-year')->name('school-year.')->group(function () {

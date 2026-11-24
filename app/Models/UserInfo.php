@@ -38,6 +38,7 @@ class UserInfo extends Model
         'course_id',
         'role_id',
         'platoon_id',
+        'platoon_unit_id',
         'specialization_id',
         'status',
         'dropped_at',
@@ -73,6 +74,21 @@ class UserInfo extends Model
     public function platoon()
     {
         return $this->belongsTo(Platoon::class, 'platoon_id', 'platoon_id');
+    }
+
+    public function platoonUnit()
+    {
+        return $this->belongsTo(PlatoonUnit::class, 'platoon_unit_id', 'unit_id');
+    }
+
+    /** "Golf 1st", or just "Golf" / "Unspecified". */
+    public function getPlatoonLabelAttribute(): string
+    {
+        if ($this->platoonUnit) {
+            return trim(($this->platoon?->platoon_name ?? $this->platoonUnit->platoon?->platoon_name ?? '') . ' ' . PlatoonUnit::ordinal($this->platoonUnit->number));
+        }
+
+        return $this->platoon?->platoon_name ?? 'Unspecified';
     }
 
     public function specialization()
@@ -175,7 +191,8 @@ class UserInfo extends Model
             'role_id'           => $this->role_id,
             'role'              => $this->role?->role_name,
             'platoon_id'        => $this->platoon_id,
-            'platoon'           => $this->platoon?->platoon_name ?? 'Unspecified',
+            'platoon'           => $this->platoon_label,
+            'platoon_unit_id'   => $this->platoon_unit_id,
             'specialization_id' => $this->specialization_id,
             'specialization'    => $this->specialization?->specialization_name ?? 'Unspecified',
             'status'            => strtolower((string) ($this->status ?? 'active')),

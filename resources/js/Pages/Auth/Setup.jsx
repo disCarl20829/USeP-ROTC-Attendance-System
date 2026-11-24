@@ -16,6 +16,7 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
         campus_id: str(prefill.campus_id),
         course_id: str(prefill.course_id),
         platoon_id: str(prefill.platoon_id),
+        platoon_unit_id: str(prefill.platoon_unit_id),
         specialization_id: str(prefill.specialization_id),
     });
 
@@ -133,9 +134,19 @@ export default function Setup({ email, prefill = {}, linked = false, options = {
                         <SelectField
                             id="platoon_id"
                             value={data.platoon_id}
-                            onChange={(v) => setData('platoon_id', v)}
+                            onChange={(v) => setData((d) => ({ ...d, platoon_id: v, platoon_unit_id: '' }))}
                             options={toOptions.platoons(options.platoons)}
                             placeholder="Select platoon"
+                        />
+                    </FormField>
+                    <FormField id="platoon_unit_id" label="Platoon number" error={errors.platoon_unit_id}>
+                        <SelectField
+                            id="platoon_unit_id"
+                            value={data.platoon_unit_id}
+                            onChange={(v) => setData('platoon_unit_id', v)}
+                            options={toOptions.platoonUnits(options.platoonUnits, data.platoon_id)}
+                            placeholder={data.platoon_id ? 'Select number' : 'Select a platoon first'}
+                            disabled={!data.platoon_id}
                         />
                     </FormField>
                     <FormField id="specialization_id" label="Specialization" error={errors.specialization_id}>

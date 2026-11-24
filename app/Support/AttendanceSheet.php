@@ -36,7 +36,9 @@ class AttendanceSheet
 
         self::addSheet($book, 'All', $rows, $sessions);
 
-        $byPlatoon = $rows->groupBy(fn ($r) => $r['platoon'] ?: 'Unassigned')->sortKeys();
+        // One sheet per numbered platoon, e.g. "Golf 1st", in platoon then number order.
+        $byPlatoon = $rows->sortBy('platoon_sort')
+            ->groupBy(fn ($r) => $r['platoon'] ?: 'Unassigned');
         foreach ($byPlatoon as $platoon => $platoonRows) {
             self::addSheet($book, (string) $platoon, $platoonRows->values(), $sessions);
         }

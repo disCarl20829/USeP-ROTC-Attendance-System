@@ -7,6 +7,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Platoon numbers** (e.g. Golf 1st, Golf 2nd): `platoon_units` table, admins add/remove
+  numbers per platoon in Settings (removal blocked while members are assigned). Cadets pick
+  platoon + number at sign-up; labels show everywhere; Excel has one sheet per platoon + number.
+
 ### Security
 - **Cadet sign-up is limited to first years of the active school year:** student ID must
   be `YYYY-NNNNN` with the year's enrollment year, and must match the number in the USeP

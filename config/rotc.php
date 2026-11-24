@@ -41,6 +41,7 @@ return [
         'cadets.assign'   => ['officer'],             // set platoon & specialization
         'cadets.delete'   => [],                      // archive / restore profiles (admin only)
         'school_year.manage' => [],                   // open / close / restore school years (admin only)
+        'platoons.manage'    => [],                   // add / remove platoon numbers (admin only)
         'roles.assign'    => [],                      // change a user's role (admin only)
         'events.manage'   => ['officer'],
         'reports.view'    => ['officer'],

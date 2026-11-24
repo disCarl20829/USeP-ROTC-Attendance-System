@@ -20,7 +20,7 @@ class AttendanceController extends Controller
             'user_id'   => $u->user_id,
             'name'      => trim("{$u->last_name}, {$u->first_name}" . ($u->middle_initial ? " {$u->middle_initial}." : '')),
             'id_number' => (string) ($u->student_id ?? ''),
-            'platoon'   => $u->platoon?->platoon_name ?? 'Unspecified',
+            'platoon'   => $u->platoon_label,
         ])->values();
 
         $records = AttendanceRecord::whereIn('user_id', $cadets->pluck('user_id'))

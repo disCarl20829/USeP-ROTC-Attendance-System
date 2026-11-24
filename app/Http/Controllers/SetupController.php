@@ -44,6 +44,7 @@ class SetupController extends Controller
                 'campus_id'         => $existing?->campus_id,
                 'course_id'         => $existing?->course_id,
                 'platoon_id'        => $existing?->platoon_id,
+                'platoon_unit_id'   => $existing?->platoon_unit_id,
                 'specialization_id' => $existing?->specialization_id,
             ],
             'linked'   => (bool) $existing,
@@ -79,6 +80,7 @@ class SetupController extends Controller
             'student_id'        => $studentIdRules,
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
             'platoon_id'        => ['required', 'integer', 'exists:platoon_list,platoon_id'],
+            'platoon_unit_id'   => LookupOptions::platoonUnitRules($request->integer('platoon_id') ?: null),
             'specialization_id' => ['required', 'integer', 'exists:specialization_list,specialization_id'],
         ]);
 
@@ -104,6 +106,7 @@ class SetupController extends Controller
             $profile->campus_id         = $data['campus_id'];
             $profile->course_id         = $data['course_id'];
             $profile->platoon_id        = $data['platoon_id'];
+            $profile->platoon_unit_id   = $data['platoon_unit_id'] ?? null;
             $profile->specialization_id = $data['specialization_id'];
             $profile->save();
 

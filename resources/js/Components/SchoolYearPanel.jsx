@@ -13,6 +13,8 @@ const ACTION_LABELS = {
     'cadets.restore': 'Restored a profile',
     purge: 'Deleted expired archives',
     'school_year.auto_start': 'School year started automatically',
+    'platoon_unit.add': 'Added platoon number',
+    'platoon_unit.remove': 'Removed platoon number',
 };
 
 function nextYearDefaults(active) {

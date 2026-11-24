@@ -21,7 +21,7 @@ class CadetController extends Controller
     {
         $linkedIds = DB::table('auth.users')->pluck('id')->flip();
 
-        $cadets = UserInfo::with(['course', 'campus', 'platoon', 'role', 'specialization'])
+        $cadets = UserInfo::with(['course', 'campus', 'platoon', 'platoonUnit', 'role', 'specialization'])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get()
@@ -82,6 +82,7 @@ class CadetController extends Controller
             'student_id'        => LookupOptions::studentIdRules(),
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
             'platoon_id'        => ['nullable', 'integer', 'exists:platoon_list,platoon_id'],
+            'platoon_unit_id'   => LookupOptions::platoonUnitRules($request->integer('platoon_id') ?: null),
             'specialization_id' => ['nullable', 'integer', 'exists:specialization_list,specialization_id'],
             'role_id'           => ['nullable', 'integer', 'exists:role_list,role_id'],
         ]);
@@ -100,6 +101,7 @@ class CadetController extends Controller
                 'campus_id'         => $data['campus_id'],
                 'course_id'         => $data['course_id'],
                 'platoon_id'        => $canAssign ? ($data['platoon_id'] ?? null) : null,
+                'platoon_unit_id'   => $canAssign && !empty($data['platoon_id']) ? ($data['platoon_unit_id'] ?? null) : null,
                 'specialization_id' => ($canAssign ? ($data['specialization_id'] ?? null) : null) ?? Specialization::defaultId(),
                 'role_id'           => ($canRoles ? ($data['role_id'] ?? null) : null) ?? LookupOptions::roleId(config('rotc.default_role')),
                 'status'            => 'active',
@@ -137,6 +139,7 @@ class CadetController extends Controller
             'student_id'        => LookupOptions::studentIdRules($cadet->info_id),
             ...LookupOptions::campusCourseRules($request->integer('campus_id') ?: null),
             'platoon_id'        => ['nullable', 'integer', 'exists:platoon_list,platoon_id'],
+            'platoon_unit_id'   => LookupOptions::platoonUnitRules($request->integer('platoon_id') ?: null),
             'specialization_id' => ['nullable', 'integer', 'exists:specialization_list,specialization_id'],
             'role_id'           => ['nullable', 'integer', 'exists:role_list,role_id'],
             'status'            => ['required', 'in:active,dropped'],
@@ -154,6 +157,7 @@ class CadetController extends Controller
 
         if (Permissions::allows($actor, 'cadets.assign')) {
             $cadet->platoon_id        = $data['platoon_id'] ?? null;
+            $cadet->platoon_unit_id   = !empty($data['platoon_id']) ? ($data['platoon_unit_id'] ?? null) : null;
             $cadet->specialization_id = $data['specialization_id'] ?? Specialization::defaultId();
         }
 

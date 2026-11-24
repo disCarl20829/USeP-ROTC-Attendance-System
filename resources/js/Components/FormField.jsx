@@ -42,6 +42,10 @@ export const toOptions = {
             .filter((c) => !campusId || !c.campus_id || String(c.campus_id) === String(campusId))
             .map((c) => ({ value: String(c.course_id), label: c.course_name })),
     platoons: (list = []) => list.map((p) => ({ value: String(p.platoon_id), label: p.platoon_name })),
+    platoonUnits: (list = [], platoonId = '') =>
+        list
+            .filter((u) => platoonId && String(u.platoon_id) === String(platoonId))
+            .map((u) => ({ value: String(u.unit_id), label: u.label })),
     specializations: (list = []) =>
         list.map((s) => ({ value: String(s.specialization_id), label: s.specialization_name })),
     roles: (list = []) => list.map((r) => ({ value: String(r.role_id), label: r.role_name })),

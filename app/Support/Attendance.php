@@ -15,7 +15,7 @@ class Attendance
     public static function cadetsQuery(bool $includeDropped = false): Builder
     {
         return UserInfo::query()
-            ->with(['course', 'platoon', 'specialization'])
+            ->with(['course', 'platoon', 'platoonUnit', 'specialization'])
             ->whereHas('role', fn ($q) => $q->whereIn(\DB::raw('lower(role_name)'), config('rotc.attendance_roles')))
             ->when(!$includeDropped, fn ($q) => $q->where('status', 'active'))
             ->orderBy('last_name')

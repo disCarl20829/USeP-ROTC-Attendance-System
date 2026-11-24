@@ -2,8 +2,9 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import FormField, { SelectField, toOptions } from '@/Components/FormField';
 import SchoolYearPanel from '@/Components/SchoolYearPanel';
+import PlatoonUnitsPanel from '@/Components/PlatoonUnitsPanel';
 
-export default function Settings({ profile = {}, utility = {}, options = {}, can = {}, schoolYears = null }) {
+export default function Settings({ profile = {}, utility = {}, options = {}, can = {}, schoolYears = null, platoonAdmin = null }) {
     const str = (v) => (v === null || v === undefined ? '' : String(v));
 
     const profileForm = useForm({
@@ -14,6 +15,7 @@ export default function Settings({ profile = {}, utility = {}, options = {}, can
         campus_id: str(profile.campus_id),
         course_id: str(profile.course_id),
         platoon_id: str(profile.platoon_id),
+        platoon_unit_id: str(profile.platoon_unit_id),
         specialization_id: str(profile.specialization_id),
     });
 
@@ -122,10 +124,20 @@ export default function Settings({ profile = {}, utility = {}, options = {}, can
                                 <SelectField
                                     id="platoon_id"
                                     value={pd.platoon_id}
-                                    onChange={(v) => profileForm.setData('platoon_id', v)}
+                                    onChange={(v) => profileForm.setData((d) => ({ ...d, platoon_id: v, platoon_unit_id: '' }))}
                                     options={toOptions.platoons(options.platoons)}
                                     placeholder="Unspecified"
                                     disabled={!can.assign}
+                                />
+                            </FormField>
+                            <FormField id="platoon_unit_id" label="Platoon number" error={pe.platoon_unit_id}>
+                                <SelectField
+                                    id="platoon_unit_id"
+                                    value={pd.platoon_unit_id}
+                                    onChange={(v) => profileForm.setData('platoon_unit_id', v)}
+                                    options={toOptions.platoonUnits(options.platoonUnits, pd.platoon_id)}
+                                    placeholder={pd.platoon_id ? 'Select number' : 'Select a platoon first'}
+                                    disabled={!can.assign || !pd.platoon_id}
                                 />
                             </FormField>
                             <FormField
@@ -157,6 +169,8 @@ export default function Settings({ profile = {}, utility = {}, options = {}, can
                 </div>
 
                 {schoolYears && <SchoolYearPanel data={schoolYears} />}
+
+                {platoonAdmin && <PlatoonUnitsPanel platoons={platoonAdmin} />}
 
                 {can.system && (
                     <div className="card p-6">

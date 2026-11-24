@@ -16,7 +16,7 @@ import {
     XMarkIcon 
 } from '@heroicons/react/24/outline';
 
-export default function Cadets({ cadets = [], archived = [], courses = [], campuses = [], platoons = [], specializations = [], roles = [], can = {} }) {
+export default function Cadets({ cadets = [], archived = [], courses = [], campuses = [], platoons = [], platoonUnits = [], specializations = [], roles = [], can = {} }) {
     // Archive (admin only): selection, bulk confirmation, archived list
     const [selected, setSelected] = useState([]);
     const [showArchived, setShowArchived] = useState(false);
@@ -77,6 +77,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
         course_id: '',
         campus_id: '',
         platoon_id: '',
+        platoon_unit_id: '',
         specialization_id: '',
         role_id: '',
         status: 'active',
@@ -92,6 +93,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
         course_id: '',
         campus_id: '',
         platoon_id: '',
+        platoon_unit_id: '',
         specialization_id: '',
         role_id: '',
         status: 'active',
@@ -146,6 +148,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
             course_id: cadet.course_id ? String(cadet.course_id) : '',
             campus_id: cadet.campus_id ? String(cadet.campus_id) : '',
             platoon_id: cadet.platoon_id ? String(cadet.platoon_id) : '',
+            platoon_unit_id: cadet.platoon_unit_id ? String(cadet.platoon_unit_id) : '',
             specialization_id: cadet.specialization_id ? String(cadet.specialization_id) : '',
             role_id: cadet.role_id ? String(cadet.role_id) : '',
             status: cadet.status || 'active',
@@ -308,10 +311,9 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             onChange={(e) => setSelectedPlatoon(e.target.value)}
                         >
                             <option value="All Platoons">All Platoons</option>
-                            <option value="Unspecified">Unspecified</option>
-                            {platoons.map((p) => (
-                                <option key={p.platoon_id} value={p.platoon_name}>
-                                    {p.platoon_name}
+                            {[...new Set(cadets.map((c) => c.platoon))].sort().map((label) => (
+                                <option key={label} value={label}>
+                                    {label}
                                 </option>
                             ))}
                         </select>
@@ -676,7 +678,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                                 id="add_platoon_id"
                                 className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={addForm.data.platoon_id}
-                                onChange={(e) => addForm.setData('platoon_id', e.target.value)}
+                                onChange={(e) => addForm.setData((d) => ({ ...d, platoon_id: e.target.value, platoon_unit_id: '' }))}
                                 disabled={!can.assign}
                             >
                                 <option value="">Unspecified</option>
@@ -688,6 +690,27 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             </select>
                             <InputError message={addForm.errors.platoon_id} className="mt-1" />
                         </div>
+                        <div>
+                            <InputLabel htmlFor="add_platoon_unit_id" value="Platoon Number" />
+                            <select
+                                id="add_platoon_unit_id"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
+                                value={addForm.data.platoon_unit_id}
+                                onChange={(e) => addForm.setData('platoon_unit_id', e.target.value)}
+                                disabled={!can.assign || !addForm.data.platoon_id}
+                            >
+                                <option value="">{addForm.data.platoon_id ? 'Select number' : 'Select a platoon first'}</option>
+                                {platoonUnits
+                                    .filter((u) => String(u.platoon_id) === String(addForm.data.platoon_id))
+                                    .map((u) => (
+                                        <option key={u.unit_id} value={u.unit_id}>
+                                            {u.label}
+                                        </option>
+                                    ))}
+                            </select>
+                            <InputError message={addForm.errors.platoon_unit_id} className="mt-1" />
+                        </div>
+
                         <div>
                             <InputLabel htmlFor="add_specialization_id" value="Specialization" />
                             <select
@@ -866,7 +889,7 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                                 id="edit_platoon_id"
                                 className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
                                 value={editForm.data.platoon_id}
-                                onChange={(e) => editForm.setData('platoon_id', e.target.value)}
+                                onChange={(e) => editForm.setData((d) => ({ ...d, platoon_id: e.target.value, platoon_unit_id: '' }))}
                                 disabled={!can.assign}
                             >
                                 <option value="">Unspecified</option>
@@ -878,6 +901,27 @@ export default function Cadets({ cadets = [], archived = [], courses = [], campu
                             </select>
                             <InputError message={editForm.errors.platoon_id} className="mt-1" />
                         </div>
+                        <div>
+                            <InputLabel htmlFor="edit_platoon_unit_id" value="Platoon Number" />
+                            <select
+                                id="edit_platoon_unit_id"
+                                className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-rotc-maroon focus:ring-rotc-maroon disabled:bg-gray-100"
+                                value={editForm.data.platoon_unit_id}
+                                onChange={(e) => editForm.setData('platoon_unit_id', e.target.value)}
+                                disabled={!can.assign || !editForm.data.platoon_id}
+                            >
+                                <option value="">{editForm.data.platoon_id ? 'Select number' : 'Select a platoon first'}</option>
+                                {platoonUnits
+                                    .filter((u) => String(u.platoon_id) === String(editForm.data.platoon_id))
+                                    .map((u) => (
+                                        <option key={u.unit_id} value={u.unit_id}>
+                                            {u.label}
+                                        </option>
+                                    ))}
+                            </select>
+                            <InputError message={editForm.errors.platoon_unit_id} className="mt-1" />
+                        </div>
+
                         <div>
                             <InputLabel htmlFor="edit_specialization_id" value="Specialization" />
                             <select
